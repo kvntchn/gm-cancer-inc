@@ -1,0 +1,34 @@
+code,description,var.name,date.name
+di,All digestive cancers,canc_di,ddiag_di
+corec,Colorectal cancer,canc_corec,ddiag_corec
+co,Colon cancer,canc_co,ddiag_co
+re,Rectal cancer,canc_re,ddiag_re
+li,Liver and intrahepatic bile duct cancers,canc_li,ddiag_li
+pa,Pancreatic cancer,canc_pa,ddiag_pa
+es,Esophageal cancer,canc_es,ddiag_es
+st,Stomach cancer,canc_st,ddiag_st
+res,All respiratory cancers,canc_res,ddiag_res
+la,Laryngeal cancer,canc_la,ddiag_la
+lu,Lung and bronchial cancers,canc_lu,ddiag_lu
+br,Breast cancer,canc_br,ddiag_br
+fe,Female genital cancers,canc_fe,ddiag_fe
+ma,Male genital cancers,canc_ma,ddiag_ma
+pr,Prostate cancer,canc_pr,ddiag_pr
+en,Endocrine cancers,canc_en,ddiag_en
+ur,Urinary cancers,canc_ur,ddiag_ur
+ki,Kidney and renal pelvic cancers,canc_ki,ddiag_ki
+bl,Bladder cancer,canc_bl,ddiag_bl
+sk,Skin cancer,canc_sk,ddiag_sk
+me,Melanoma,canc_me,ddiag_me
+ner,Brain and nervous system cancers,canc_ner,ddiag_ner
+brn,Brain cancer,canc_brn,ddiag_brn
+my,Myeloma,canc_my,ddiag_my
+leu,Leukemia,canc_leu,ddiag_leu
+ll,Lymphocytic leukemia,canc_ll,ddiag_ll
+cll,Chronic Lymphocytic leukemia,canc_cll,ddiag_cll
+mml,Myeloid and monocytic leukemia,canc_mml,ddiag_mml
+aml,Acute myeloid leukemia,canc_aml,ddiag_aml
+lym,Lymphoma,canc_lym,ddiag_lym
+nhl,Non-Hodgkin's lymphoma,canc_nhl,ddiag_nhl
+copd,Chronic obstructive pulmonary disease,Chronic obstructive pulmonary disease,yod
+external,All external causes,All external causes,yod

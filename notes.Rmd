@@ -1,0 +1,155 @@
+---
+title: Notes on Cancer
+author: "Kevin Chen"
+# date: Compiled on \today
+# fontsize: 10pt
+output:
+  html_document
+  # pdf_document:
+  #  # keep_tex: true
+  #  includes:
+  #    in_header: ~/HeadRs/StatHead.sty
+# geometry: margin=1.5cm, top=2.5cm, bottom=2.5cm
+csl: ~/HeadRs/AMA.csl
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+source("~/HeadRs/00-my-theme.R")
+knitr::opts_chunk$set(echo=F)
+library(boxr)
+library(xtable)
+```
+
+
+# Review of cancer biology (from Weinberg)
+
+## Tumors arise from normal tissues
+
+- Most cell types proliferate and participate in morphogenesis, so
+	- They may wrongfully gain access to certain genetic information
+	- Their genomic sequences may be corrupted
+- When there are such perturbations, cells may undergo growth that no longer follows the "normal" rules
+- Cancers are classified by presumed tissue or organ site of origin
+- Cancers also classified by degree of agressiveness:
+	- Those that do not invade other tissues: benign
+	- Malignant otherwise
+- Benign growths can also cause problems
+	- Excessive hormone production
+	- Pressure on neighboring sites
+
+## Tumors arise from specialized cell types
+
+- Most tumors arise in epithelia
+- Epithelia spawn carcinomas, responsible for > 80% of caner-related deaths in West
+	- Those forming protective layers spawn squamous cell carcinomas
+	- Those which secrete substances spawn adenocarinomas
+- Nonepithelial cells
+	- Connective tissue, which spawn sarcomas
+		- Includes pre-endothelial tissue, which spawn angiosarcomas
+	- Blood-forming hematopoietic tissues
+		- Leukemia: malignant derivatives of WBCs that move freely throughout circulation
+		- Lymphoma: malignant derivatives of B and T lymphoctes, that aggregate to form masses
+	- Third and last: neuroectodermal
+		gliomas, glioblastomas, neruoblastomas, schwannomas, and medulloblastomas
+
+## Special tumors (don't fit into major types)
+
+- Melanomas originate from melanocytes, which arise from the neural crest
+	- Usually not considered neuroectodermal
+- Small-cell lung carcinomas are also neurosecretory-like
+	- Likely originated from endodermal cell populations, but lost their epithelial characteristics to take on neureectodermal characteristics
+
+# Non-Hodgkin's Lymphoma
+
+## American cancer society
+
+- Hodgkin lymphoma marked by the presence of the Reed-Sternberg cell, usually derived from B lymphocytes
+- Non-Hodgkin lymphoma is all lymphomas that aren't Hodgkin Lymphoma
+- Exposures linked to NHL lymphoma
+	- Benzene, herbicides, and insecticides
+	- Past chemotherapy (very likely confounded by health history)
+	- Drugs used to treat rheumatoid arhtritis e.g. methotrexate and tumor necrosis factor inhibitors
+	- Radiation
+	- Weakened immune system
+	- Autoimmune disease
+	- Infection with human T-cell lymphotropic virus (HTLV-1)
+		- Common in Japan and the Caribbean, but not in US
+	- Infection with the Epstein-Barr virus (EBV)
+		- In US, only significant among those with HIV
+	- Infection with herpes virus 8 (HHV-8), also known as Kaposi sarcoma-associated herpes virus (KSHV), leads primary effusion lymphoma (rare)
+		- Only significant among those with HIV
+	- Infection with _H. pylori_ linked with mucosa-associated lymphoid tissue (MALT) lymphoma of the stomach
+	- Infection with _Chlamydophila psittaci_, which causes the lung disease called _psittacosis_, linked with MALT lymphoma around the eye
+	- Infection with _Campylobactor jejuni_ linked with MALT around the small intestine
+		- Endemic to the Mediterranean
+	- Long-term infection with the hepatitis C virus
+	- Obesity
+
+## InterLymph
+
+- Large case-control study including data collected by member studies from the International Lymphoma Epidemiology Consortium (InterLymph), Europe (De Sanjose et al. 2008)
+- Cigarette smoking associated with follicular lymphoma, but not other NHL subtypes (Morton et al. 2005)
+- Positive association with hairdresser profession and farming (Slager et al. 2014)
+
+## Reviews
+
+- Fisher and Fisher (2004) and Müller et al. (2005)
+	- More common among males than females
+	- More common among white folks than black folks
+	- Malignancies typically diagnosted for those 50 years or older
+	- Cancer incidence and mortality for NHL have ben increasing, even as those for cancers in general have been decreasing
+	- Subtypes segregate by geography.. link to viral endemicity?
+
+## Occupational exposure
+
+- Most of the work done for farmers, farm workers, and their households
+- Barry et al. (2011)
+	- Population-based cohort study of rowmen in Connecticut
+	- Strong result for chlorinated solvents, carbon tetrachlrodie, dichloromethane
+- Fritschi et al. (2005)
+	- Case control, exposure to solvents (other than Benzene), metals, organic dusts, and PCBs
+	- Australia
+	- All null
+- Wang et al. (2008)
+	- Populaton-based case-control of women in Connecticut
+	- Clorinated solvents, formaldehyde
+	- Null/borderline
+- Hidajat et al. (2018)
+	- Cancer mortality risk in a cohort study with subdistribution hazard ratios
+	- Competing risks analysis; exposure to N-nitrosamines
+- Purdue et al. (2011)
+	- Case-control
+	- Significant/borderline results for Tricholorethylene
+	
+## Mirer 2003
+
+- Straight, soluble, and semi-synthetic MWFs all share a common oil exposure
+- Synthetic MWFs have no oil, but contain similar non-oil components as soluble and semi-synthetic MWFs
+
+----------------------------------------------------------------------------
+Component                      Straight       Soluble       Synthetic
+------------------------------ -------------- ------------- ----------------
+Petroleum                      Yes            Most          Low/none       
+
+Edible oils                    Yes            Some          None        
+
+Chlorinated Paraffin           Yes            Some          None        
+
+Petroleum sulfonates           None           Yes           None        
+
+Biocides                       None           Yes           Yes        
+
+Nitrites (nitrosamines)        None           Yes           Yes        
+
+Non-ionic surfactant           None           Yes           Yes        
+
+Alkanolamines                  None           Most          Yes        
+
+Borates                        None           Most          Yes        
+
+Microorganisms                 Some           Yes           Yes        
+
+Water                          Some           Yes           Yes        
+
+----------------------------------------------------------------------------
