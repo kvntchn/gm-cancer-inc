@@ -3,7 +3,7 @@ title: "Cancer incidence and HWSE path analysis"
 subtitle: "GM-UAW Cohort Study"
 # author: "Kevin Chen"
 date: \today
-fontsize: 10pt
+fontsize: 11pt
 output:
   pdf_document:
     # latex_engine: lualatex
@@ -20,12 +20,20 @@ output:
   #   # latex_engine: lualatex
   #   includes:
   #     in_header: "~/HeadRs/BeamerHead.sty"
-# bibliography: ./../../references/gm.bib
-# csl: "C:/Users/kevchen/Documents/HeadRs/AMA.csl"
+bibliography: "`r path.expand('~/eisen/gm/references/gm.bib')`"
+csl: "`r path.expand('~/HeadRs/csl/ama.csl')`"
 geometry: margin=2.54cm
 ---
 
-\renewcommand{\arraystretch}{1.1}
+\onehalfspacing
+<!-- \renewcommand{\arraystretch}{1.1} -->
+\fancyhead[L]{Cancer incidence (including SEER data)}
+\renewcommand{\headrulewidth}{0pt}
+
+This packet summarizes Cox proportional hazard model results relating cumulative exposure to straight, soluble, and synthetic metalworking fluids (MWF) to cancer incidence of 14 types and for all sites combined (includes types not shown here) in the UAW-GM Cohort. The types are colon, rectal, pancreatic, esophageal, stomach, laryngeal, lung & bronchial, breast, prostate, kidney and renal pelvic, bladder, melanoma, leukemia, and non-Hodgkin lymphoma. In addition, path analyses testing for the presence of healthy worker survivor effect ar presented. These include Cox models relating emloyment status to cancer incidence and one Cox model relating cumulative MWF exposure to leaving work. The path analyses largely follow the methods outlined in Garcia et al.[@Garcia_2017]
+
+The study population, summarized in Table \ref{tab:tab1}, includes subjects from the UAW-GM Cohort who were still alive at the start of cancer incidence follow-up. Cancer incidence data were abstracted from Michigan Cancer Registry for all plants from years 1985 onward. Cancer incidence data for plants 1 and 2 were supplemented with data from the Surveillance, Epidemiology, and End Results Program (SEER). Follow-up begins three years after hire and no earlier than 1973 for plants 1 and 2 or 1985 for plant 3. Follow-up ends upon reaching the the oldest observed age at death (considered lost to follow-up), death, cancer incidence, or the year 2015, whichever comes first. In the path analyses for employment status and cancer incidence, subjects were also censored upon reaching their 80^th^ birthday.
+
 
 ```{r, echo=F}
 exposure.lag <- 21
@@ -42,10 +50,7 @@ messy_sol <- 0.05
 
 ```
 
-\fancyhead[L]{Cancer incidence (including SEER data)}
 \fancyhead[R]{Exposure lagged `r exposure.lag` years}
-\renewcommand{\headrulewidth}{0pt}
-
 
 ```{r setup, include=F}
 knitr::opts_chunk$set(echo = F,
@@ -81,7 +86,6 @@ if (!('cohort_analytic' %in% ls())) {
 
 ```
 
-
 ```{r get.tab1, eval=F}
 source(here::here('reports', 'table1.R'))
 tab1 <- get.tab1(
@@ -109,13 +113,13 @@ tab1 <- cbind(rownames(tab1), tab1)
 
 colnames(tab1)[1:4] <- c(" ", "$n$", "$p$", "  ")
 
-description.width <- 7
-column.width <- 1.5
+description.width <- 8
+column.width <- 1.75
 table.break <- "Years of follow-"
 
 if (table.engine == 'xtable') {
 	tab1 %>% as.data.frame(check.names = F) %>% xtable(
-		label = "tab1.tab",
+		label = "tab:tab1",
 		align = paste0('cp{', description.width, 'cm}',
 									 paste0(rep(
 									 	paste0('R{', column.width, 'cm}'), ncol(.) - 1
@@ -228,7 +232,7 @@ clean.coef.tab <- function(x,
 \caption{Adjusted hazard ratios associated with exposure to straight metal working fluids in the \textbf{UAW-GM Cohort}.}
 \label{fig:str}
 \centering
-\includegraphics[width=8in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("str", ifelse(is.finite(messy_sol),
+\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("str", ifelse(is.finite(messy_sol),
 						 paste0("_sol", messy_sol %/% .01), ""), "_facet.pdf"))`"}
 \end{figure}
 
@@ -236,7 +240,7 @@ clean.coef.tab <- function(x,
 \caption{Adjusted hazard ratios associated with exposure to soluble metal working fluids in the \textbf{UAW-GM Cohort}.}
 \label{fig:sol}
 \centering
-\includegraphics[width=8in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("sol", ifelse(is.finite(messy_sol),
+\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("sol", ifelse(is.finite(messy_sol),
 						 paste0("_sol", messy_sol %/% .01), ""), "_facet.pdf"))`"}
 \end{figure}
 
@@ -244,7 +248,7 @@ clean.coef.tab <- function(x,
 \caption{Adjusted hazard ratios associated with exposure to synthetic metal working fluids in the \textbf{UAW-GM Cohort}.}
 \label{fig:syn}
 \centering
-\includegraphics[width=8in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag),  paste0("syn", ifelse(is.finite(messy_sol),
+\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag),  paste0("syn", ifelse(is.finite(messy_sol),
 						 paste0("_sol", messy_sol %/% .01), ""), "_facet.pdf"))`"}
 \end{figure}
 
@@ -529,3 +533,5 @@ invisible(
 )
 
 ```
+
+____

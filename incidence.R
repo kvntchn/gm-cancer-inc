@@ -122,7 +122,7 @@ Sys.sleep(0)
 # Get cohort HWSE 2 ####
 if (!("cohort2" %in% ls())) {
 	outcome.type <- 'incidence'
-	source(here::here('../gm-wrangling/wrangling', '05-Get-Exposure-Outcome.R'))
+	source(here::here('../gm-wrangling/wrangling', '06-Get-Exposure-Outcome.R'))
 	cohort2 <- get.cohort_analytic(
 		outcome_type = outcome.type,
 		exposure.lag = 1,
@@ -2464,7 +2464,7 @@ get.facet_tikz <- function(
 # 				 employment_status.lag = employment_status.lag)
 #
 # # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
+# 
 # # MWF-outcome HRs ####
 # str.ggtab <- rbindlist(get.ggtab())
 # str.ggtab[,`:=`(I = .N:1)]
@@ -2472,14 +2472,14 @@ get.facet_tikz <- function(
 # str.ggtab <- str.ggtab[
 # 	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
 # 	]
-#
+# 
 # sol.ggtab <- rbindlist(get.ggtab("Soluble"))
 # sol.ggtab[,`:=`(I = .N:1)]
 # og_sol.ggtab <- as.data.table(as.data.frame(sol.ggtab))
 # sol.ggtab <- sol.ggtab[
 # 	!(grepl("^0|^\\$0", level) | level == "0 to 0.05" | is.na(level) | level == ""),
 # 	]
-#
+# 
 # syn.ggtab <- rbindlist(get.ggtab("Synthetic"))
 # syn.ggtab[,`:=`(I = .N:1)]
 # og_syn.ggtab <- as.data.table(as.data.frame(syn.ggtab))
@@ -2494,7 +2494,7 @@ get.facet_tikz <- function(
 # 	directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
 # lualatex(pattern = "*\\.tex",
 # 				 directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
-#
+
 # # HWSE 2 HRs ####
 # og_hwse.ggtab <- rbindlist(get.hwse.ggtab(
 # 	additional.lag = exposure.lag - 1,
