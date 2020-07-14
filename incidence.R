@@ -110,11 +110,14 @@ if (!('cohort_analytic' %in% ls())) {
 		"Chronic obstructive pulmonary disease",
 		"All external causes",
 		"nohist", "wh", "immortal", "right.censored",
-		"possdiscr_new", "flag77", "oddend", "status15"), with = F])
+		"possdiscr_new", "flag77", "oddend",
+		"status15", "cancinccoh15_new"), with = F])
 
 	# Drop unnecessary data ####
 	cohort_analytic <- cohort_analytic[
-		wh == 1 & nohist == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 &
+			# cancinccoh15_new == 1 &
+			possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 }
 
@@ -192,7 +195,7 @@ if (ncol(cohort2) > length(col.names)) {
 
 	# Drop unnecessary data ####
 	mortality.cohort2 <- mortality.cohort2[
-		wh == 1 & nohist == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 & possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -222,7 +225,9 @@ if (ncol(cohort2) > length(col.names)) {
 
 	# Drop unnecessary data ####
 	cohort2 <- cohort2[
-		wh == 1 & nohist == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 &
+			# cancinccoh15_new == 1 &
+			possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 }
 
@@ -737,7 +742,7 @@ get.coxph <- function(
 			# Save model  ####
 			if (is.null(directory.name)) {
 				directory.name <- to_drive_D(here::here(
-					paste0("cancer incidence/resources/Lag ",
+					paste0("resources/Lag ",
 								 exposure.lag + additional.lag,
 								 ifelse(!grepl("age", time_scale),
 								 			 "/indexed by calendar",
@@ -826,7 +831,7 @@ get.hwse2.coxph <- function(
 	spline_year = T,
 	spline_yin = T,
 	time_scale = "age",
-	additional.lag = 20,
+	additional.lag = 0,
 	employment_status.lag = 0) {
 
 	options(warn = 2)
@@ -1112,7 +1117,7 @@ get.hwse2.coxph <- function(
 			directory.name <- paste(
 				to_drive_D(here::here(
 					paste('./resources/hwse 2',
-								paste0("lag ", 1 + additional.lag),
+								paste0("lag ", exposure.lag + additional.lag),
 								ifelse(employment_status.lag != 0,
 											 paste0("Employment status lagged ", employment_status.lag, " years"),
 											 ""
@@ -1539,7 +1544,7 @@ get.hwse3.coxph <- function(
 
 		directory.name <- to_drive_D(here::here(paste0(
 			'./resources/hwse 3',
-			"/Lag ", 1 + additional.lag,
+			"/Lag ", exposure.lag + additional.lag,
 			ifelse(employment_status.lag != 0,
 						 paste0("/Employment status lagged ", employment_status.lag, " years"),
 						 ""),
@@ -1584,7 +1589,7 @@ get.hwse3.coxph <- function(
 
 # Get Coef ####
 get.coef <- function(
-	outcomes = outcomes.which, #c(32, 33),
+	outcomes = outcomes.which,
 	cohort_name = NULL,
 	analytic.name = NULL,
 	new_dat = F,
@@ -1607,7 +1612,7 @@ get.coef <- function(
 		outcomes <- 1
 	}
 
-	invisible(sapply(outcomes, function(i = 15) {
+	invisible(sapply(outcomes, function(i = 25) {
 
 		code <- unlist(incidence.key[i, 1])
 		description <- unlist(incidence.key[i, 2])
@@ -1672,7 +1677,7 @@ get.coef <- function(
 								 paste0("lag ", exposure.lag + additional.lag),
 								 paste0(
 								 	ifelse(hwse2, "hwse 2", "hwse 3"),
-								 	"/Lag ", 1 + additional.lag,
+								 	"/Lag ", exposure.lag + additional.lag,
 								 	ifelse(employment_status.lag != 0,
 								 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
 								 				 ""))),
@@ -2035,7 +2040,7 @@ get.coef <- function(
 				paste0(
 					ifelse(hwse2 | hwse3,
 								 paste0(ifelse(hwse2, "hwse 2", "hwse 3"),
-								 			 "/Lag ", 1 + additional.lag,
+								 			 "/Lag ", exposure.lag + additional.lag,
 								 			 ifelse(employment_status.lag != 0,
 								 			 			 paste0("/Employment status lagged ", employment_status.lag, " years"), "")),
 								 paste0("Lag ", exposure.lag))),
@@ -2134,7 +2139,7 @@ get.ggtab <- function(mwf = "Straight",
 		code <- unlist(incidence.key[i, 1]); description <- unlist(incidence.key[i, 2])
 
 		directory <- here::here(paste(
-			"./resources",
+			"./reports/resources",
 			paste0("Lag ", exposure.lag),
 			ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
 			sep = "/"
@@ -2199,7 +2204,7 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 													 messy_sol = 0.05,
 													 spline_year = T,
 													 spline_yin = T,
-													 additional.lag = 20,
+													 additional.lag = 0,
 													 employment_status.lag = 0) {
 	lapply(outcomes, function(
 		i = outcomes.which[1]
@@ -2220,8 +2225,8 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 			lapply(1:length(dir.names), function(i) {
 				coef.tab <- readRDS(
 					paste0(here::here(
-						paste0("./resources/hwse 2",
-									 paste0("/lag ", 1 + additional.lag),
+						paste0("./reports/resources/hwse 2",
+									 paste0("/lag ", exposure.lag + additional.lag),
 									 ifelse(employment_status.lag == 0, "",
 									 			 paste0("/Employment status lagged ",
 									 			 			 employment_status.lag, " years")),
@@ -2360,10 +2365,13 @@ get.tikz <- function(
 get.facet_tikz <- function(
 	ggtab.prefix = c("str", "sol", "syn", "hwse"),
 	file.prefix = NULL,
-	directory = NULL) {
+	directory = NULL,
+	messy_sol = 0.05) {
 
 	lapply(ggtab.prefix, function(prefix = "str") {
 
+		i <- which(ggtab.prefix == prefix)
+		
 		if (is.null(directory)) {
 		directory <- here::here(paste0("./reports/resources",
 																	 ifelse(grepl("hwse", prefix), "/hwse 2", ""),
@@ -2420,49 +2428,49 @@ get.facet_tikz <- function(
 	})
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # # Run model ####
 # # MWF-Cancer with Messy soluble ####
 # get.coxph(
-# 	# outcomes = 32,
+# 	# outcomes = c(25, 31),
 # 	run_model = T,
 # 	time_scale = "age")
 # get.coef(
-# 	# outcomes = outcomes.which[outcomes.which >= 15],
+# 	# outcomes = c(25, 31),
 # 	# new_dat = F,
 # 	time_scale = "age")
-#
+# 
 # rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
-#
-# #  HWSE 2 with Messy soluble ####
+# 
+#  # HWSE 2 with Messy soluble ####
 # get.hwse2.coxph(
-# 	# outcomes = outcomes.which[1],
+# 	# outcomes = c(25, 31),
 # 	run_model = T,
 # 	time_scale = "age",
-# 	additional.lag = exposure.lag - 1,
+# 	additional.lag = 0,
 # 	employment_status.lag = employment_status.lag
 # )
 # sapply(c("Binary", paste("Age", seq(50, 60, 5))),
 # 			 function(x) {get.coef(
-# 			 	# outcomes = 32:33,
+# 			 	# outcomes = c(25, 31),
 # 			 	new_dat = F,
 # 			 	time_scale = "age",
 # 			 	employment.which = x,
 # 			 	spline_year = T,
 # 			 	spline_yin = T,
 # 			 	hwse2 = T,
-# 			 	additional.lag = exposure.lag - 1,
+# 			 	additional.lag = 0,
 # 			 	employment_status.lag = employment_status.lag)})
-#
+# 
 # #  HWSE 3 with Messy soluble ####
 # get.hwse3.coxph(
 # 	run_model = T,
-# 	additional.lag = exposure.lag - 1,
+# 	additional.lag = 0,
 # 	employment_status.lag = employment_status.lag)
 # get.coef(time_scale = "age", hwse3 = T,
-# 				 additional.lag = exposure.lag - 1,
+# 				 additional.lag = 0,
 # 				 employment_status.lag = employment_status.lag)
-#
+# 
 # # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 
 # # MWF-outcome HRs ####
@@ -2486,30 +2494,30 @@ get.facet_tikz <- function(
 # syn.ggtab <- syn.ggtab[
 # 	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
 # 	]
-#
+# 
 # # Compile figure ####
 # get.tikz(
 # 	ggtab.prefix = c("str", "sol", "syn"),
 # 	file.prefix = c("str_sol5", "sol_sol5", "syn_sol5"),
 # 	directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
-# lualatex(pattern = "*\\.tex",
+# lualatex(pattern = "*sol5\\.tex",
 # 				 directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
-
+# 
 # # HWSE 2 HRs ####
 # og_hwse.ggtab <- rbindlist(get.hwse.ggtab(
-# 	additional.lag = exposure.lag - 1,
+# 	additional.lag = 0,
 # 	# # Change messy_sol for clean soluble referent group
 # 	# messy_sol = 0.05,
 # 	time_scale = "age",
 # 	employment_status.lag = employment_status.lag))
 # og_hwse.ggtab[,`:=`(I = .N:1)]
 # hwse.ggtab <- as.data.table(as.data.frame(og_hwse.ggtab))
-#
-#
+# 
+# 
 # hwse.ggtab <- hwse.ggtab[
 # 	!(grepl("Still", level) | is.na(level) | level == ""),
 # 	]
-#
+# 
 # hwse.ggtab <- hwse.ggtab[!grepl("Still| 50| 55", level)]
 # hwse.ggtab <- hwse.ggtab[,.(
 # 	level = c(NA, level),
@@ -2519,10 +2527,10 @@ get.facet_tikz <- function(
 # 	cases = c(NA, cases),
 # 	I = NA
 # ), by = .(Outcome)]
-#
+# 
 # hwse.ggtab[,`:=`(I = .N:1)]
 # hwse.ggtab <- hwse.ggtab[!is.na(level)]
-#
+# 
 # # Compile for HWSE 2 ####
 # get.tikz(ggtab.prefix = "hwse",
 # 				 directory = here::here(paste0(
@@ -2538,8 +2546,8 @@ get.facet_tikz <- function(
 # 				 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
 # 				 				 "")
 # 				 )))
-#
-#
+# 
+# 
 # # Facet view ###
 # get.facet_tikz()
 # # Compile
