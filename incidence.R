@@ -3,15 +3,11 @@
 # February 28, 2020
 
 library(here)
-here::set_here()
+# here::set_here()
 
 # rm(list = ls())
 # rm(list = ls()[-grep("outcome.selected", ls())])
 # rm(list = ls()[-grep('cohort', ls())])
-
-outcomes.which <- c(3, 4, 6:8, 10:12, 15, 18, 19, 21, 25, 31, 32)
-# Specify YOUT ####
-yout.which <- "yout"
 
 if (!grepl("gm", getwd(), ignore.case = T)) {
 	if ("here" %in% .packages()) {
@@ -48,14 +44,14 @@ if (!('cohort_analytic' %in% ls())) {
 	)
 	setorder(cohort_analytic, studyno, year)
 	cohort_analytic[, `:=`(yin.gm = date.to.gm(yin))]
-
+	
 	# Keep only people who appear in the exposure data
 	cohort_analytic <-
 		cohort_analytic[studyno %in% unique(exposure$studyno)]
-
+	
 	# PICK YOUT ####
 	cohort_analytic[, jobloss.date := get(yout.which)]
-
+	
 	# Exposure after leaving work is 0
 	cohort_analytic[year > (year(jobloss.date) + exposure.lag), `:=`(
 		straight = 0,
@@ -72,7 +68,7 @@ if (!('cohort_analytic' %in% ls())) {
 		cum_soluble = cumsum(soluble),
 		cum_synthetic = cumsum(synthetic)
 	), by = .(studyno)]
-
+	
 	# Which columns ####
 	col.names <- names(cohort_analytic[, c(
 		"studyno",
@@ -110,11 +106,14 @@ if (!('cohort_analytic' %in% ls())) {
 		"Chronic obstructive pulmonary disease",
 		"All external causes",
 		"nohist", "wh", "immortal", "right.censored",
-		"possdiscr_new", "flag77", "oddend", "status15"), with = F])
-
+		"possdiscr_new", "flag77", "oddend",
+		"status15", "cancinccoh15_new"), with = F])
+	
 	# Drop unnecessary data ####
 	cohort_analytic <- cohort_analytic[
-		wh == 1 & nohist == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 &
+			# cancinccoh15_new == 1 &
+			possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 }
 
@@ -140,10 +139,10 @@ if (ncol(cohort2) > length(col.names)) {
 	# Keep only people who appear in the exposure data
 	cohort2 <- cohort2.og[studyno %in% unique(exposure$studyno)]
 	# Fill job loss date with yout if unavailable
-
+	
 	# PICK YOUT ####
 	cohort2[, jobloss.date := get(yout.which)]
-
+	
 	# Exposure after leaving work is 0
 	cohort2[year > (year(jobloss.date) + 1), `:=`(straight = 0,
 																								soluble = 0,
@@ -159,16 +158,16 @@ if (ncol(cohort2) > length(col.names)) {
 		cum_soluble = cumsum(soluble),
 		cum_synthetic = cumsum(synthetic)
 	), by = .(studyno)]
-
+	
 	# # Censor those still at work in 1995
 	# cohort2 <- cohort2[year < 1995 | year(jobloss.date) < 1995]
 	# # Stop FU in 1994
 	# cohort2 <- cohort2[year < 1995,]
-
+	
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	# Mortality cohort for positive/negative controls ####
 	mortality.cohort2 <- as.data.table(as.data.frame(cohort2))
-
+	
 	# Censor at 80
 	mortality.cohort2[, `:=`(yoc = as.Date(apply(data.frame(
 		yoc,
@@ -189,14 +188,14 @@ if (ncol(cohort2) > length(col.names)) {
 			yoc + days(1)
 		), 1, min, na.rm = T)
 	), yob), 'day'))]
-
+	
 	# Drop unnecessary data ####
 	mortality.cohort2 <- mortality.cohort2[
-		wh == 1 & nohist == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 & possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
-
+	
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+	
 	# Censor at 80 or first cancer
 	cohort2[, `:=`(yoc = as.Date(apply(data.frame(
 		yoc,
@@ -219,10 +218,12 @@ if (ncol(cohort2) > length(col.names)) {
 			yoc + days(1)
 		), 1, min, na.rm = T)
 	), yob), 'day'))]
-
+	
 	# Drop unnecessary data ####
 	cohort2 <- cohort2[
-		wh == 1 & nohist == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 &
+			# cancinccoh15_new == 1 &
+			possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 }
 
@@ -290,20 +291,20 @@ get.coxph <- function(
 	additional.lag = 0,
 	directory.name = NULL,
 	employment_status.lag = 0) {
-
+	
 	options(warn = 2)
-
+	
 	invisible(sapply(outcomes, function(i = outcomes.which[8]) {
 		# Get data ####
-
+		
 		# Two-to-three letter code indicating cancer type
 		code <- unlist(incidence.key[i, 1])
 		# Cancer type
 		description <- unlist(incidence.key[i, 2])
-
+		
 		var.name <- unlist(incidence.key[i, 3])
 		date.name <- unlist(incidence.key[i, 4])
-
+		
 		# If looking at employment status, either as an outcome or as an exposure
 		if (is.null(cohort_name)) {
 			if (hwse3 | hwse2) {
@@ -314,9 +315,9 @@ get.coxph <- function(
 			} else {
 				cohort_name <- "cohort_analytic"
 			}}
-
+		
 		dat <- as.data.table(as.data.frame(get(cohort_name)))
-
+		
 		# When to start FU ####
 		# HWSE 3 is for the MWF-leaving work association: no bounds to FU
 		# If looking at mortality outcome, no need to start FU later
@@ -332,20 +333,20 @@ get.coxph <- function(
 					dat[plant == 3, start.year := 1985]
 				}
 		}
-
+		
 		dat <- dat[year >= start.year]
-
+		
 		if (!hwse3 & nrow(dat[
 			plant == 3 &
 			!i %in% which(grepl("copd|external", incidence.key$code)) &
 			year < 1985]) > 0) {
 			warning("Cancer incidence FU for plant 3 before 1985?")}
-
+		
 		# Lag leaving work ####
 		dat[,`:=`(employment_status_lag = employment_status.lag,
 							unlagged_jobloss.date = jobloss.date,
 							unlagged_age.leavework = time_length(difftime(jobloss.date, yob), 'year'))]
-
+		
 		# Censor when (lagged) employment status not known ####
 		if (hwse2 | hwse3) {
 			if (employment_status.lag > 0) {
@@ -361,7 +362,7 @@ get.coxph <- function(
 				dat <- dat[jobloss.date <= as.Date("1994-12-31") | year <= 1994 ]
 				dat[,`:=`(employment_status_lag = 0)]
 			}}
-
+		
 		if (!hwse3) {
 			dat[,`:=`(status = get(var.name),
 								yoi = get(date.name))]
@@ -372,10 +373,10 @@ get.coxph <- function(
 			dat[year > year(jobloss.date), status := 2]
 			dat$yoi <- dat$jobloss.date
 		}
-
+		
 		# If incidence is after date of death, make it the date of death
 		dat[yoi > yod, yoi := yod]
-
+		
 		# Drop unnecessary data ####
 		dat <- dat[, .(
 			studyno, age.year1, age.year2, status,
@@ -389,30 +390,30 @@ get.coxph <- function(
 			unlagged_jobloss.date, employment_status_lag, unlagged_age.leavework,
 			ddiag_first, canc_first, immortal, right.censored
 		)]
-
-
+		
+		
 		dat <- dat[year <= as.integer(apply(data.frame(
 			year(yoi),
 			year(yod),
 			year(yoc),
 			end.year), 1, min, na.rm = T)),]
-
+		
 		# Order data
 		setorder(dat, studyno, year)
 		dat[, `:=`(I = 1:.N,
 							 N = .N), by = .(studyno)]
-
+		
 		# Fix age.year1 for those hired before start.year - 3
 		dat[year(yin) + 3 < start.year & I == 1, `:=`(
 			age.year1 = time_length(
 				difftime(as.Date(paste0(start.year, "-01-01")), yob), 'days'),
 			year1 = as.Date(paste0(start.year - 1, "-12-31"))
 		)]
-
+		
 		# Must be at-risk for incidence (or jobloss)
 		dat <- dat[yoi >= yin + years(3) | is.na(yoi)]
 		dat <- dat[status != 2]
-
+		
 		# Fix age.year2 at time of incidence (or jobloss)
 		dat[status == 1, `:=`(age.year2 = floor(time_length(difftime(
 			as.Date(apply(
@@ -439,13 +440,13 @@ get.coxph <- function(
 			min,
 			na.rm = T
 		)))]
-
-
+		
+		
 		# Don't confuse yoi with jobloss.date in the case of HWSE 3
 		if (hwse3) {
 			dat$yoi <- NA
 		}
-
+		
 		# Duration of employment ####
 		dat[, `:=`(
 			`Duration of employment` = time_length(difftime(as.Date(
@@ -455,7 +456,7 @@ get.coxph <- function(
 				), 1, min, na.rm = T)
 			),
 			yin), 'year'))]
-
+		
 		# Additional lag ####
 		setorder(dat, studyno, year)
 		dat[,`:=`(I = 1:.N,
@@ -488,12 +489,12 @@ get.coxph <- function(
 				cum_synthetic = cumsum(synthetic)
 			), by = .(studyno)]
 		}
-
+		
 		# Age at leaving work (before employment status lag)
 		dat[,`:=`(
 			age.leavework = time_length(difftime(jobloss.date, yob), 'year')
 		)]
-
+		
 		# Define quantiles ####
 		covariate.breaks <- apply(dat[status == 1, .(
 			year,
@@ -514,9 +515,9 @@ get.coxph <- function(
 				breaks[c(1, length(breaks))] <- c(-Inf, Inf)
 				breaks
 			})
-
+		
 		covariate.breaks <- as.data.table(covariate.breaks)
-
+		
 		# # Pool last two calendar year levels
 		# covariate.breaks[is.finite(year), year := {
 		# 	if (length(year) > 1) {
@@ -527,7 +528,7 @@ get.coxph <- function(
 		# }]
 		# # Restrict lower bound of last Year category?
 		# covariate.breaks[year > 2010 & is.finite(year), year := NA]
-
+		
 		mwf.breaks <- cbind(apply(dat[status == 1, .(
 			straight,
 			soluble,
@@ -592,9 +593,9 @@ get.coxph <- function(
 				}
 				breaks
 			}))
-
+		
 		mwf.breaks <- as.data.table(mwf.breaks)
-
+		
 		# Make categorical variables ####
 		dat[, `:=`(
 			Year = cut(
@@ -664,7 +665,7 @@ get.coxph <- function(
 				dig.lab = 3
 			)
 		)]
-
+		
 		dat[,`:=`(
 			Race = {
 				race <- relevel(factor(race), "White")
@@ -673,14 +674,14 @@ get.coxph <- function(
 			Sex = factor(sex, levels = c("M", "F"), labels = c("Male", "Female")),
 			Plant = relevel(factor(plant), "1")
 		)]
-
+		
 		dat[, `:=`(
 			year1.date = year1,
 			year2.date = year2,
 			year1 = as.numeric(year1, origin = as.Date("1970-01-01")),
 			year2 = as.numeric(year2, origin = as.Date("1970-01-01"))
 		)]
-
+		
 		# dat <- dat[studyno %in% sample(studyno, 5000)]
 		setorder(dat, studyno, age.year2)
 		# Save data ####
@@ -692,7 +693,7 @@ get.coxph <- function(
 				envir = .GlobalEnv)
 			Sys.sleep(0)
 		}
-
+		
 		# Run model ####
 		if (run_model) {
 			dat <- dat[immortal != 1 & right.censored != 1]
@@ -733,19 +734,19 @@ get.coxph <- function(
 				}
 			},
 			method = "efron")
-
+			
 			# Save model  ####
 			if (is.null(directory.name)) {
 				directory.name <- to_drive_D(here::here(
-					paste0("cancer incidence/resources/Lag ",
+					paste0("resources/Lag ",
 								 exposure.lag + additional.lag,
 								 ifelse(!grepl("age", time_scale),
 								 			 "/indexed by calendar",
 								 			 "/indexed by age"))))
 			}
-
+			
 			dir.create(directory.name, showWarnings = F, recursive = T)
-
+			
 			saveRDS(tmp.coxph,
 							file = paste0(
 								directory.name, "/",
@@ -759,11 +760,11 @@ get.coxph <- function(
 											 ifelse(spline_yin, paste0("_splinedyin"), "")),
 								".coxph.rds"
 							))
-
+			
 			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
 			# 	nrow(dat[age.year2 <= age.year1])
 			# }
-
+			
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(unlist(description))
 			cat("\n")
@@ -826,24 +827,24 @@ get.hwse2.coxph <- function(
 	spline_year = T,
 	spline_yin = T,
 	time_scale = "age",
-	additional.lag = 20,
+	additional.lag = 0,
 	employment_status.lag = 0) {
-
+	
 	options(warn = 2)
-
+	
 	invisible(sapply(outcomes, function(i = outcomes.which[1]) {
-
+		
 		code <- unlist(incidence.key[i, 1])
 		description <- unlist(incidence.key[i, 2])
 		var.name <- unlist(incidence.key[i, 3])
-
+		
 		# Clean up working directory
 		rm(list = grep("*\\.dat$", ls(), value = T))
 		rm(list = grep("tmp.coxph", ls(), value = T))
-
+		
 		# Get data ####
 		if (!(paste0(code, ".dat2") %in% ls()) | new_dat) {
-
+			
 			get.coxph(
 				cohort_name = cohort_name,
 				run_model = F,
@@ -852,13 +853,13 @@ get.hwse2.coxph <- function(
 				additional.lag = additional.lag,
 				employment_status.lag = employment_status.lag
 			)
-
+			
 			dat <- as.data.table(as.data.frame(get(paste0(code, ".dat2"), envir = .GlobalEnv)))
-
+			
 			# Special attention to (lagged) leaving work ####
 			dat[year >= year(jobloss.date), `Employment status` := 1]
 			dat[year < year(jobloss.date) | yoi <= jobloss.date, `Employment status` := 0]
-
+			
 			{
 				# Years other than year of leaving work
 				dat1 <- dat[year != year(jobloss.date) |
@@ -899,7 +900,7 @@ get.hwse2.coxph <- function(
 																(yoi <= yoi | is.na(yoi)), 1, 0),
 							`Employment status` = 0
 						)]
-
+				
 				# Year of leaving work
 				dat2 <- dat[year == year(jobloss.date) &
 											year(jobloss.date) < (1995  + employment_status.lag) &
@@ -963,7 +964,7 @@ get.hwse2.coxph <- function(
 					status = ifelse(status == 1 & yoi > jobloss.date, 1, 0),
 					`Employment status` = 1
 				)]
-
+				
 				dat1[, `:=`(
 					year1 = as.numeric(year1, origin = as.Date("1970-01-01")),
 					year2 = as.numeric(year2, origin = as.Date("1970-01-01"))
@@ -976,7 +977,7 @@ get.hwse2.coxph <- function(
 					year1 = as.numeric(year1, origin = as.Date("1970-01-01")),
 					year2 = as.numeric(year2, origin = as.Date("1970-01-01"))
 				)]
-
+				
 				dat <- rbindlist(list(dat1, dat2, dat3))
 				dat[, `:=`(
 					year1.date = as.Date(year1, origin = as.Date("1970-01-01")),
@@ -985,13 +986,13 @@ get.hwse2.coxph <- function(
 				# If death/incidence date is date of leaving work, make it on the job
 				dat[yoi == jobloss.date & year == year(jobloss.date), `Employment status` := 0]
 				dat[year(jobloss.date) >= 1995 + employment_status.lag | jobloss.date > yoc, `Employment status` := 0]
-
+				
 				dat[year > year(jobloss.date),
 						`Employment status` := 1]
-
+				
 				setorder(dat, studyno, age.year2)
 			}
-
+			
 			# Indicator for age at leaving work ####
 			dat[,`:=`(
 				age.leavework = time_length(difftime(jobloss.date, yob), 'year')
@@ -1040,18 +1041,18 @@ get.hwse2.coxph <- function(
 								 				 paste0("Left work at least ", employment_status.lag, " years ago (Age 60 or older)"))
 								 ))}
 			)]
-
+			
 			setorder(dat, studyno, year, year2)
 			# dat <- dat[!(year == year(jobloss.date) &
 			# 						 	yoi < jobloss.date &
 			# 						 	`Employment status` == 1),]
-
+			
 			# Check time 2 > time 1
 			# dat[year2 <= year1, .(year1, year2, yob, yoc, jobloss.date, yin)]
 		} else {
 			dat <- get(paste0(code, ".dat2"))
 		}
-
+		
 		# dat <- dat[studyno %in% sample(unique(studyno), 8000)]
 		# Save data ####
 		if (save_dat) {
@@ -1061,11 +1062,11 @@ get.hwse2.coxph <- function(
 						 envir = .GlobalEnv)
 			Sys.sleep(0)
 		}
-
+		
 		# dat <- dat[studyno %in% sample(
 		# 	unique(dat$studyno), 10000
 		# )]
-
+		
 		if (run_model) {
 			dat <- dat[immortal != 1 & right.censored != 1]
 			Sys.sleep(0)
@@ -1107,12 +1108,12 @@ get.hwse2.coxph <- function(
 				}
 			},
 			method = "efron")
-
+			
 			# Save model  ####
 			directory.name <- paste(
 				to_drive_D(here::here(
 					paste('./resources/hwse 2',
-								paste0("lag ", 1 + additional.lag),
+								paste0("lag ", exposure.lag + additional.lag),
 								ifelse(employment_status.lag != 0,
 											 paste0("Employment status lagged ", employment_status.lag, " years"),
 											 ""
@@ -1122,9 +1123,9 @@ get.hwse2.coxph <- function(
 											 "indexed by age"
 								), sep = "/"))),
 				c("Binary", "Age 50", "Age 55", "Age 60"), sep = "/")
-
+			
 			sapply(directory.name, dir.create, showWarnings = F, recursive = T)
-
+			
 			saveRDS(tmp.coxph,
 							file = paste(
 								directory.name[1],
@@ -1139,18 +1140,18 @@ get.hwse2.coxph <- function(
 											 ".coxph.rds"),
 								sep = "/"
 							))
-
+			
 			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
 			# 	nrow(dat[age.year2 <= age.year1])
 			# }
-
+			
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(unlist(description))
 			cat("\n")
 			cat(paste0(tmp.coxph$nevent, " cases"))
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(tmp.coxph)
-
+			
 			# Fit model: Age 50 ####
 			tmp.coxph <- coxph(as.formula(
 				paste(
@@ -1189,7 +1190,7 @@ get.hwse2.coxph <- function(
 				}
 			},
 			method = "efron")
-
+			
 			# Save model  ####
 			saveRDS(tmp.coxph,
 							file = paste(
@@ -1205,18 +1206,18 @@ get.hwse2.coxph <- function(
 											 ".coxph.rds"),
 								sep = "/"
 							))
-
+			
 			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
 			# 	nrow(dat[age.year2 <= age.year1])
 			# }
-
+			
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(unlist(description))
 			cat("\n")
 			cat(paste0(tmp.coxph$nevent, " cases"))
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(tmp.coxph)
-
+			
 			# Fit model: Age 55 ####
 			tmp.coxph <- coxph(as.formula(
 				paste(
@@ -1255,7 +1256,7 @@ get.hwse2.coxph <- function(
 				}
 			},
 			method = "efron")
-
+			
 			# Save model  ####
 			saveRDS(tmp.coxph,
 							file = paste(
@@ -1271,18 +1272,18 @@ get.hwse2.coxph <- function(
 											 ".coxph.rds"),
 								sep = "/"
 							))
-
+			
 			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
 			# 	nrow(dat[age.year2 <= age.year1])
 			# }
-
+			
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(unlist(description))
 			cat("\n")
 			cat(paste0(tmp.coxph$nevent, " cases"))
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(tmp.coxph)
-
+			
 			# Fit model: Age 60 ####
 			tmp.coxph <- coxph(as.formula(
 				paste(
@@ -1321,7 +1322,7 @@ get.hwse2.coxph <- function(
 				}
 			},
 			method = "efron")
-
+			
 			# Save model  ####
 			saveRDS(tmp.coxph,
 							file = paste(
@@ -1337,11 +1338,11 @@ get.hwse2.coxph <- function(
 											 ".coxph.rds"),
 								sep = "/"
 							))
-
+			
 			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
 			# 	nrow(dat[age.year2 <= age.year1])
 			# }
-
+			
 			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 			print(unlist(description))
 			cat("\n")
@@ -1410,16 +1411,16 @@ get.hwse3.coxph <- function(
 	time_scale = "age",
 	additional.lag = 0,
 	employment_status.lag = 0) {
-
+	
 	options(warn = 2)
-
+	
 	# Clean up working directory
 	rm(list = grep("*\\.dat$", ls(), value = T))
 	rm(list = grep("tmp.coxph", ls(), value = T))
-
+	
 	# Get data ####
 	if (!("dat3" %in% ls()) | new_dat) {
-
+		
 		get.coxph(
 			cohort_name = cohort_name,
 			run_model = F,
@@ -1429,9 +1430,9 @@ get.hwse3.coxph <- function(
 			additional.lag = additional.lag,
 			employment_status.lag = employment_status.lag
 		)
-
+		
 		dat <- get("dat3", envir = .GlobalEnv)
-
+		
 		# Indicator for age at leaving work ####
 		dat[,`:=`(
 			age.leavework = time_length(difftime(jobloss.date, yob), 'year')
@@ -1481,19 +1482,19 @@ get.hwse3.coxph <- function(
 							 				 paste0("Left work at least ", employment_status.lag, " years ago (Age 60 or older)"))
 							 ))}
 		)]
-
+		
 		setorder(dat, studyno, year, year2)
-
+		
 		# dat <- dat[!(year == year(jobloss.date) &
 		# 						 	yoi < jobloss.date &
 		# 						 	`Employment status` == 1),]
-
+		
 		# Check time 2 > time 1
 		# dat[year2 <= year1, .(year1, year2, yob, yoc, jobloss.date, yin)]
 	} else {
 		dat <- get("dat3")
 	}
-
+	
 	# dat <- dat[studyno %in% sample(unique(studyno), 8000)]
 	# Save data ####
 	if (save_dat) {
@@ -1503,7 +1504,7 @@ get.hwse3.coxph <- function(
 					 envir = .GlobalEnv)
 		Sys.sleep(0)
 	}
-
+	
 	if (run_model) {
 		dat <- dat[immortal != 1 & right.censored != 1]
 		Sys.sleep(0)
@@ -1536,10 +1537,10 @@ get.hwse3.coxph <- function(
 		),
 		data = dat,
 		method = "efron")
-
+		
 		directory.name <- to_drive_D(here::here(paste0(
 			'./resources/hwse 3',
-			"/Lag ", 1 + additional.lag,
+			"/Lag ", exposure.lag + additional.lag,
 			ifelse(employment_status.lag != 0,
 						 paste0("/Employment status lagged ", employment_status.lag, " years"),
 						 ""),
@@ -1547,9 +1548,9 @@ get.hwse3.coxph <- function(
 							"/indexed by calendar",
 							"/indexed by age")
 		)))
-
+		
 		dir.create(directory.name, showWarnings = F, recursive = T)
-
+		
 		# Save model  ####
 		saveRDS(tmp.coxph,
 						file = paste(
@@ -1565,26 +1566,26 @@ get.hwse3.coxph <- function(
 								".coxph.rds")),
 							sep = "/"
 						))
-
+		
 		# if (nrow(dat[age.year2 <= age.year1]) > 0) {
 		# 	nrow(dat[age.year2 <= age.year1])
 		# }
-
+		
 		cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 		print("HWSE Condition 3: previous MWF exposure as a predictor of leaving work")
 		cat("\n")
 		cat(paste0(tmp.coxph$nevent, " cases"))
 		cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
 		print(tmp.coxph)
-
+		
 	}
-
+	
 	options(warn = 0)
 }
 
 # Get Coef ####
 get.coef <- function(
-	outcomes = outcomes.which, #c(32, 33),
+	outcomes = outcomes.which,
 	cohort_name = NULL,
 	analytic.name = NULL,
 	new_dat = F,
@@ -1602,22 +1603,22 @@ get.coef <- function(
 	directory = NULL,
 	file.prefix = NULL
 ) {
-
+	
 	if (hwse3) {
 		outcomes <- 1
 	}
-
-	invisible(sapply(outcomes, function(i = 15) {
-
+	
+	invisible(sapply(outcomes, function(i = 25) {
+		
 		code <- unlist(incidence.key[i, 1])
 		description <- unlist(incidence.key[i, 2])
 		var.name <- unlist(incidence.key[i, 3])
-
+		
 		if (hwse3) {
 			code <- ""
 			description <- "Leaving work"
 		}
-
+		
 		# Get data ####
 		if (is.null(analytic.name)) {
 			if (!hwse2 & !hwse3) {
@@ -1637,7 +1638,7 @@ get.coef <- function(
 													employment_status.lag = employment_status.lag)
 					dat.og <- as.data.table(as.data.frame(get("dat3")))}
 			}
-
+			
 			if (!grepl('breast|female|prosate', description, ignore.case = T)) {
 				dat.og <- dat.og
 			} else if (grepl("prostate", description, ignore.case = T)) {
@@ -1646,9 +1647,9 @@ get.coef <- function(
 				dat.og <- dat.og[Sex == "Female"]
 			}
 		} else {dat.og <- get(analytic.name)}
-
+		
 		dat <- as.data.table(as.data.frame(dat.og))
-
+		
 		if (is.null(mod.name)) {mod.name <- paste0(
 			code,
 			ifelse(is.finite(messy_sol), # & !(hwse2 | hwse3),
@@ -1661,9 +1662,9 @@ get.coef <- function(
 						 			 paste0("_splinedyin"),
 						 			 "")),
 			".coxph", '.rds')
-
+		
 		mod.name <- gsub("^_", "", mod.name)}
-
+		
 		if (is.null(mod.directory)) {
 			mod.directory <- to_drive_D(here::here(
 				paste(
@@ -1672,7 +1673,7 @@ get.coef <- function(
 								 paste0("lag ", exposure.lag + additional.lag),
 								 paste0(
 								 	ifelse(hwse2, "hwse 2", "hwse 3"),
-								 	"/Lag ", 1 + additional.lag,
+								 	"/Lag ", exposure.lag + additional.lag,
 								 	ifelse(employment_status.lag != 0,
 								 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
 								 				 ""))),
@@ -1684,13 +1685,13 @@ get.coef <- function(
 								 			ifelse(hwse2, employment.which, ""), sep = "/")),
 					sep = "/")))
 		}
-
+		
 		# Get model ####
 		tmp.coxph <- readRDS(gsub("//", "/",
 															paste0(mod.directory, "/",
 																		 mod.name))
 		)
-
+		
 		library(mgcv)
 		if (!"gam" %in% class(tmp.coxph)) {
 			tmp.coef <- summary(tmp.coxph)$coefficients
@@ -1707,7 +1708,7 @@ get.coef <- function(
 			colnames(tmp.coef)[1:5] <- c("Covariate", "Estimate", "SE", "t", "p")
 		}
 		tmp.coef <- as.data.table(tmp.coef)
-
+		
 		# Clean covariate name
 		covariates <- names(attr(tmp.coxph$terms, "dataClasses"))
 		covariates <- covariates[!grepl("Surv|strata\\(.*\\)|status", covariates)]
@@ -1716,9 +1717,9 @@ get.coef <- function(
 		if ("gam" %in% class(tmp.coxph)) {
 			covariates <- c("(Intercept)", covariates)
 		}
-
+		
 		covariate.levels <- tmp.coxph$xlevels
-
+		
 		tmp.coef[!grepl(ifelse("gam" %in% class(tmp.coxph),
 													 "^s\\(", "pspline\\("), Covariate),
 						 Covariate := {
@@ -1726,13 +1727,13 @@ get.coef <- function(
 						 	unlist(sapply(1:length(covariates), function(i) {
 						 		rep(names(covariates)[i], covariates[i] - 1)}))
 						 }]
-
+		
 		tmp.coef[grepl(
 			ifelse("gam" %in% class(tmp.coxph), "^s\\(", "pspline\\("), Covariate),`:=`(
 				Covariate = as.vector(sapply(covariates[grepl(ifelse("gam" %in% class(tmp.coxph),
 																														 "^s\\(", "pspline\\("), covariates)], rep, 2))
 			)]
-
+		
 		# Clean levels
 		tmp.coef[grep("soluble_", Covariate), Covariate := "Cumulative_soluble_5"]
 		tmp.coef[
@@ -1744,7 +1745,7 @@ get.coef <- function(
 							unlist(covariate.levels[names(covariate.levels) == x])[-1]
 						}))
 			)]
-
+		
 		# Confidence intervals
 		tmp.coef <- tmp.coef[, .(
 			Covariate = gsub("`", "", Covariate),
@@ -1767,10 +1768,10 @@ get.coef <- function(
 										 	"\\]", level
 										 )) - 1)
 		)]
-
+		
 		# Need for getting spline df
 		full.covariates <- unique(tmp.coef$Covariate)
-
+		
 		# Set aside splined stuff
 		if (spline_year | spline_yin) {
 			tmp.spline.coef <- tmp.coef[grepl("pspline|^s\\(", Covariate)]
@@ -1780,16 +1781,16 @@ get.coef <- function(
 			)]
 			tmp.coef <- tmp.coef[!grepl("pspline|^s\\(", Covariate)]
 		}
-
+		
 		covariates <- unique(tmp.coef$Covariate)
-
+		
 		# Pretty covariate/level ####
 		tmp.coef <- rbindlist(lapply(
 			covariates[which(covariates != "(Intercept)")],
 			function(x = covariates[1]) {
 				# Get relevant rows
 				dat <- tmp.coef[grep(paste0(x, "$"), tmp.coef$Covariate), ]
-
+				
 				# Make pretty level
 				lower <- dat$lower
 				upper <- dat$upper
@@ -1810,9 +1811,9 @@ get.coef <- function(
 					} else if (grepl("Sex", x)) {
 						level <- levels(dat.og$Sex)[-1]
 					}
-
+					
 					dat$level <- level
-
+					
 					# Get referent level
 					if (grepl("Cumu", x)) {
 						ref.lower <- -Inf
@@ -1844,7 +1845,7 @@ get.coef <- function(
 						level <- levels(dat.og$Sex)[-1]
 					}
 				}
-
+				
 				if (hwse2) {
 					# Pretty levels HWSE 2 ####
 					if (grepl("Employ", x)) {
@@ -1878,12 +1879,12 @@ get.coef <- function(
 					} else if (grepl("Sex", x)) {
 						level <- levels(dat.og$Sex)[-1]
 					}
-
+					
 					if (length(level) != length(dat$level)) {
 						stop(paste0("Incorrect number of levels for covariate: ", print(x)))
 					}
 					dat$level <- level
-
+					
 					# Get referent level
 					if (grepl("Employ", x)) {
 						ref.upper <- ref.lower <- NA
@@ -1927,7 +1928,7 @@ get.coef <- function(
 						level <- levels(dat.og$Sex)[-1]
 					}
 				}
-
+				
 				# Get case count
 				if (!x %in% names(dat.og)) {
 					x <- gsub("`", "", x)
@@ -1937,7 +1938,7 @@ get.coef <- function(
 					stop(paste0("Incorrect number of levels (counts) for covariate: ", print(x)))
 				}
 				dat$n <- n[-1]
-
+				
 				# Make data.table
 				rbindlist(list(
 					data.table(
@@ -1954,15 +1955,15 @@ get.coef <- function(
 					dat
 				),
 				use.names = T)
-
+				
 			}))
-
+		
 		if (!"gam" %in% class(tmp.coxph)) {
 			tmp.coef$events <- tmp.coxph$nevent
 		} else {
 			tmp.coef$events <- sum(tmp.coxph$y)
 		}
-
+		
 		coef.tab <-
 			tmp.coef[, .(
 				Covariate = {
@@ -1991,15 +1992,15 @@ get.coef <- function(
 				)),
 				events
 			)]
-
+		
 		coef.tab[grepl("NA", p), p := NA]
-
+		
 		# Add back splined stuff ####
 		if (spline_year | spline_yin) {
 			tmp.coef <- rbindlist(list(
 				tmp.coef, tmp.spline.coef
 			), use.names = T, fill = T)
-
+			
 			spline.tab <- tmp.spline.coef[!duplicated(Covariate)]
 			coef.tab <- rbindlist(
 				list(
@@ -2027,7 +2028,7 @@ get.coef <- function(
 					)]
 				), use.names = T, fill = T)
 		}
-
+		
 		# Save coefficient table ####
 		if (is.null(directory)) {
 			directory <- gsub("//", "/", here::here(paste(
@@ -2035,7 +2036,7 @@ get.coef <- function(
 				paste0(
 					ifelse(hwse2 | hwse3,
 								 paste0(ifelse(hwse2, "hwse 2", "hwse 3"),
-								 			 "/Lag ", 1 + additional.lag,
+								 			 "/Lag ", exposure.lag + additional.lag,
 								 			 ifelse(employment_status.lag != 0,
 								 			 			 paste0("/Employment status lagged ", employment_status.lag, " years"), "")),
 								 paste0("Lag ", exposure.lag))),
@@ -2045,9 +2046,9 @@ get.coef <- function(
 			))
 			)
 		}
-
+		
 		dir.create(directory, showWarnings = F, recursive = T)
-
+		
 		if (is.null(file.prefix)) {
 			file.prefix <- paste0(
 				code,
@@ -2057,35 +2058,35 @@ get.coef <- function(
 							 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
 							 ifelse(spline_yin, paste0("_splinedyin"), ""))
 			)
-
+			
 			file.prefix <- gsub("^_", "", file.prefix)}
-
+		
 		saveRDS(tmp.coef,
 						paste(directory,
 									paste0(file.prefix, ".coef.rds"),
 									sep = "/")
 		)
-
+		
 		saveRDS(coef.tab,
 						paste(
 							directory,
 							paste0(file.prefix, ".tab.rds"),
 							sep = "/")
 		)
-
+		
 		coef.tab[is.na(coef.tab)] <- ""
 		coef.tab[, (names(coef.tab)) := lapply(coef.tab, function(x) {
 			gsub("\\\\,|\\$|NA", " ", x)
 		})]
-
+		
 		coef.tab[, `:=`(` ` = ifelse(is.finite(as.numeric(p)), ifelse(
 			p < 0.01, "**", ifelse(p < 0.05, "*", ifelse(p < 0.1, ".", ""))
 		), ""))]
-
+		
 		assign(gsub(" ", "_", unlist(description)),
 					 coef.tab,
 					 envir = .GlobalEnv)
-
+		
 		cat(paste0("\n", paste0(rep("_", 100), collapse = ""), "\n"))
 		cat(unlist(description))
 		cat("\n")
@@ -2108,16 +2109,16 @@ clean.coef.tab <- function(x,
 	} else {
 		tmp.tab[is.na(`(95% CI)`), `(95% CI)` := "$-$"]
 	}
-
+	
 	tmp.tab[!is.na(as.numeric(`$p$`)),`:=`(
 		` ` = ifelse(`$p$` < 0.05 & !is.na(as.numeric(`$p$`)), "$*$", "")
 	)]
-
+	
 	if (table.engine == 'xtable') {
 		tmp.tab[!grepl("0.00", `$p$`) & !is.na(`$p$`), `:=`(
 			`$p$` = paste0("", `$p$`, "\\phantom{0}"))]}
 	tmp.tab$`$p$` <- gsub("0.00", "< 0.005", tmp.tab$`$p$`)
-
+	
 	return(tmp.tab)
 }
 
@@ -2132,14 +2133,14 @@ get.ggtab <- function(mwf = "Straight",
 	lapply(outcomes, function(i = outcomes[1]) {
 		# Exposure-incidence model
 		code <- unlist(incidence.key[i, 1]); description <- unlist(incidence.key[i, 2])
-
+		
 		directory <- here::here(paste(
-			"./resources",
+			"./reports/resources",
 			paste0("Lag ", exposure.lag),
 			ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
 			sep = "/"
 		))
-
+		
 		file.prefix <- paste0(
 			code,
 			ifelse(is.finite(messy_sol),
@@ -2148,20 +2149,20 @@ get.ggtab <- function(mwf = "Straight",
 						 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
 						 ifelse(spline_yin, paste0("_splinedyin"), ""))
 		)
-
+		
 		file.prefix <- gsub("^_", "", file.prefix)
-
+		
 		coef.tab <- readRDS(paste(
 			directory,
 			paste0(file.prefix, ".tab.rds"),
 			sep = "/"))
-
+		
 		coef.tab <- clean.coef.tab(coef.tab)
-
+		
 		# Clean up covariate name
 		coef.tab[Covariate == "Cumulative soluble 5",
 						 Covariate := "Cumulative soluble"]
-
+		
 		coef.tab <- coef.tab[grepl(mwf, zoo::na.locf(Covariate), ignore.case = T)]
 		coef.tab[grepl("--", `(95\\% CI)`), `(95\\% CI)` := NA]
 		coef.tab[, `:=`(
@@ -2173,7 +2174,7 @@ get.ggtab <- function(mwf = "Straight",
 			ci.lower = substr(`(95\\% CI)`, 3, unlist(gregexpr(",\\\\,", `(95\\% CI)`)) - 1),
 			ci.upper = substr(`(95\\% CI)`, unlist(gregexpr(",\\\\,", `(95\\% CI)`)) + 3, nchar(`(95\\% CI)`) - 2)
 		)]
-
+		
 		coef.tab[,.(
 			Outcome,
 			Covariate,
@@ -2199,14 +2200,14 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 													 messy_sol = 0.05,
 													 spline_year = T,
 													 spline_yin = T,
-													 additional.lag = 20,
+													 additional.lag = 0,
 													 employment_status.lag = 0) {
 	lapply(outcomes, function(
 		i = outcomes.which[1]
 	) {
 		# Exposure-incidence model
 		code <- unlist(incidence.key[i, 1]); description <- unlist(incidence.key[i, 2])
-
+		
 		dir.names <- c("Binary",
 									 "Age 50", "Age 55",
 									 "Age 60")
@@ -2220,8 +2221,8 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 			lapply(1:length(dir.names), function(i) {
 				coef.tab <- readRDS(
 					paste0(here::here(
-						paste0("./resources/hwse 2",
-									 paste0("/lag ", 1 + additional.lag),
+						paste0("./reports/resources/hwse 2",
+									 paste0("/lag ", exposure.lag + additional.lag),
 									 ifelse(employment_status.lag == 0, "",
 									 			 paste0("/Employment status lagged ",
 									 			 			 employment_status.lag, " years")),
@@ -2245,7 +2246,7 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 				coef.tab <- clean.coef.tab(coef.tab[rows.which[[i]],])
 				coef.tab[,level := unlist(levels.new[i])]
 			}))
-
+		
 		coef.tab[, `:=`(
 			Outcome = paste0(description),#, " (", events, " cases)"),
 			cases = paste0("(", events, " cases)"),
@@ -2254,7 +2255,7 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 			ci.lower = substr(`(95\\% CI)`, 3, unlist(gregexpr(",\\\\,", `(95\\% CI)`)) - 1),
 			ci.upper = substr(`(95\\% CI)`, unlist(gregexpr(",\\\\,", `(95\\% CI)`)) + 3, nchar(`(95\\% CI)`) - 2)
 		)]
-
+		
 		coef.tab[,.(
 			Outcome,
 			level,
@@ -2271,13 +2272,13 @@ get.tikz <- function(
 	ggtab.prefix = c("str", "sol", "syn"),
 	file.prefix = NULL,
 	directory = NULL) {
-
+	
 	prefix.which <- 1:length(ggtab.prefix)
-
+	
 	sapply(prefix.which, function(i = 1) {
-
+		
 		gg.tab <- get(paste0(ggtab.prefix[i], ".ggtab"))
-
+		
 		# legend.tab <- gg.tab[,.(
 		# 	I = c(quantile(I, 0.25), quantile(I, 0.25) + 1.5),
 		# 	description = c(cases[1], Outcome[1])),
@@ -2292,7 +2293,7 @@ get.tikz <- function(
 				"\\end{tabular}")
 		),
 		by = .(Outcome)]
-
+		
 		dir.create(directory, showWarnings = F, recursive = T)
 		tikz(file = paste(directory, paste0(ifelse(is.null(file.prefix[i]), ggtab.prefix[i], file.prefix[i]), ".tex"), sep = "/"),
 				 standAlone = T, width = 6.5, height = 8.5)
@@ -2360,38 +2361,41 @@ get.tikz <- function(
 get.facet_tikz <- function(
 	ggtab.prefix = c("str", "sol", "syn", "hwse"),
 	file.prefix = NULL,
-	directory = NULL) {
-
+	directory = NULL,
+	messy_sol = 0.05) {
+	
 	lapply(ggtab.prefix, function(prefix = "str") {
-
+		
+		i <- which(ggtab.prefix == prefix)
+		
 		if (is.null(directory)) {
-		directory <- here::here(paste0("./reports/resources",
-																	 ifelse(grepl("hwse", prefix), "/hwse 2", ""),
-																	 "/Lag ", exposure.lag))
-	}
-
+			directory <- here::here(paste0("./reports/resources",
+																		 ifelse(grepl("hwse", prefix), "/hwse 2", ""),
+																		 "/Lag ", exposure.lag))
+		}
+		
 		gg.tab <- as.data.table(as.data.frame(get(paste0("og_", prefix, ".ggtab"))))
 		gg.tab <- gg.tab[!grepl(" 50| 55", level)]
-
+		
 		gg.tab[is.na(as.numeric(ci.lower)), `:=`(
 			ci.lower = "1.00", ci.upper = "1.00"
 		)]
-
+		
 		gg.tab[, `:=`(
 			Outcome = factor(paste(Outcome, cases),
 											 levels = unique(paste(Outcome, cases))),
 			HR = as.numeric(HR),
 			ci.lower = as.numeric(ci.lower),
 			ci.upper = as.numeric(ci.upper))]
-
+		
 		gg.tab[,`:=`(
 			level.factor = factor(.N:1)
 		), by = .(Outcome)]
-
+		
 		tikz(file = paste(
 			directory,
 			paste0(ifelse(is.null(file.prefix[i]), prefix, file.prefix), paste0("_sol", messy_sol %/% .01), "_facet.tex"), sep = "/"),
-				 standAlone = T, width = 11, height = 8.5)
+			standAlone = T, width = 11, height = 8.5)
 		print(ggplot(gg.tab, aes(
 			x = level.factor,
 			y = HR,
@@ -2403,7 +2407,7 @@ get.facet_tikz <- function(
 			coord_flip(
 				ylim = {if (grepl("hwse", prefix)) {
 					c(-1.25, 2)
-					} else {c(-1.225, 2.5)}},
+				} else {c(-1.225, 2.5)}},
 				xlim = c(max(gg.tab[,.N, by = .(Outcome)]$N) + 1, 0)
 			) +
 			scale_y_continuous(breaks = c(0.5, 1, 1.5, 2, if (!grepl("hwse", prefix)) {2.5})) +
@@ -2420,130 +2424,3 @@ get.facet_tikz <- function(
 	})
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# # Run model ####
-# # MWF-Cancer with Messy soluble ####
-# get.coxph(
-# 	# outcomes = 32,
-# 	run_model = T,
-# 	time_scale = "age")
-# get.coef(
-# 	# outcomes = outcomes.which[outcomes.which >= 15],
-# 	# new_dat = F,
-# 	time_scale = "age")
-#
-# rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
-#
-# #  HWSE 2 with Messy soluble ####
-# get.hwse2.coxph(
-# 	# outcomes = outcomes.which[1],
-# 	run_model = T,
-# 	time_scale = "age",
-# 	additional.lag = exposure.lag - 1,
-# 	employment_status.lag = employment_status.lag
-# )
-# sapply(c("Binary", paste("Age", seq(50, 60, 5))),
-# 			 function(x) {get.coef(
-# 			 	# outcomes = 32:33,
-# 			 	new_dat = F,
-# 			 	time_scale = "age",
-# 			 	employment.which = x,
-# 			 	spline_year = T,
-# 			 	spline_yin = T,
-# 			 	hwse2 = T,
-# 			 	additional.lag = exposure.lag - 1,
-# 			 	employment_status.lag = employment_status.lag)})
-#
-# #  HWSE 3 with Messy soluble ####
-# get.hwse3.coxph(
-# 	run_model = T,
-# 	additional.lag = exposure.lag - 1,
-# 	employment_status.lag = employment_status.lag)
-# get.coef(time_scale = "age", hwse3 = T,
-# 				 additional.lag = exposure.lag - 1,
-# 				 employment_status.lag = employment_status.lag)
-#
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 
-# # MWF-outcome HRs ####
-# str.ggtab <- rbindlist(get.ggtab())
-# str.ggtab[,`:=`(I = .N:1)]
-# og_str.ggtab <- as.data.table(as.data.frame(str.ggtab))
-# str.ggtab <- str.ggtab[
-# 	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
-# 	]
-# 
-# sol.ggtab <- rbindlist(get.ggtab("Soluble"))
-# sol.ggtab[,`:=`(I = .N:1)]
-# og_sol.ggtab <- as.data.table(as.data.frame(sol.ggtab))
-# sol.ggtab <- sol.ggtab[
-# 	!(grepl("^0|^\\$0", level) | level == "0 to 0.05" | is.na(level) | level == ""),
-# 	]
-# 
-# syn.ggtab <- rbindlist(get.ggtab("Synthetic"))
-# syn.ggtab[,`:=`(I = .N:1)]
-# og_syn.ggtab <- as.data.table(as.data.frame(syn.ggtab))
-# syn.ggtab <- syn.ggtab[
-# 	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
-# 	]
-#
-# # Compile figure ####
-# get.tikz(
-# 	ggtab.prefix = c("str", "sol", "syn"),
-# 	file.prefix = c("str_sol5", "sol_sol5", "syn_sol5"),
-# 	directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
-# lualatex(pattern = "*\\.tex",
-# 				 directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
-
-# # HWSE 2 HRs ####
-# og_hwse.ggtab <- rbindlist(get.hwse.ggtab(
-# 	additional.lag = exposure.lag - 1,
-# 	# # Change messy_sol for clean soluble referent group
-# 	# messy_sol = 0.05,
-# 	time_scale = "age",
-# 	employment_status.lag = employment_status.lag))
-# og_hwse.ggtab[,`:=`(I = .N:1)]
-# hwse.ggtab <- as.data.table(as.data.frame(og_hwse.ggtab))
-#
-#
-# hwse.ggtab <- hwse.ggtab[
-# 	!(grepl("Still", level) | is.na(level) | level == ""),
-# 	]
-#
-# hwse.ggtab <- hwse.ggtab[!grepl("Still| 50| 55", level)]
-# hwse.ggtab <- hwse.ggtab[,.(
-# 	level = c(NA, level),
-# 	HR = c(NA, HR),
-# 	ci.lower = c(NA, ci.lower),
-# 	ci.upper = c(NA, ci.upper),
-# 	cases = c(NA, cases),
-# 	I = NA
-# ), by = .(Outcome)]
-#
-# hwse.ggtab[,`:=`(I = .N:1)]
-# hwse.ggtab <- hwse.ggtab[!is.na(level)]
-#
-# # Compile for HWSE 2 ####
-# get.tikz(ggtab.prefix = "hwse",
-# 				 directory = here::here(paste0(
-# 				 	"./reports/resources/hwse 2/Lag ", exposure.lag,
-# 				 	ifelse(employment_status.lag != 0,
-# 				 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
-# 				 				 "")
-# 				 )))
-# lualatex(pattern = "*\\.tex",
-# 				 directory = here::here(paste0(
-# 				 	"./reports/resources/hwse 2/Lag ", exposure.lag,
-# 				 	ifelse(employment_status.lag != 0,
-# 				 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
-# 				 				 "")
-# 				 )))
-#
-#
-# # Facet view ###
-# get.facet_tikz()
-# # Compile
-# lualatex(pattern = "*facet\\.tex",
-# 				 directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
-# lualatex(pattern = "*facet\\.tex",
-# 				 directory = here::here(paste0("./reports/resources/hwse 2/Lag ", exposure.lag)))

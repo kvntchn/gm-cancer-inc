@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.12.0 (TeX Live 2020)  (format=lualatex 2020.4.7)  1 JUL 2020 22:25
+This is LuaHBTeX, Version 1.12.0 (TeX Live 2020)  (format=lualatex 2020.4.7)  14 JUL 2020 06:23
  restricted system commands enabled.
 **sol_sol5.tex
 (./sol_sol5.tex
@@ -695,13 +695,13 @@ Here is how much of LuaTeX's memory you used:
  444 words of node memory still in use:
    4 hlist, 1 vlist, 1 rule, 2 glue, 3 kern, 1 glyph, 8 attribute, 48 glue_spec,
  8 attribute_list, 3 write, 1 special, 1 pdf_colorstack nodes
-   avail lists: 2:10480,3:3158,4:231,5:32,6:2,7:3538,8:5,9:935,11:11
+   avail lists: 2:10480,3:3158,4:231,5:34,6:2,7:3532,8:5,9:935,11:11
  33273 multiletter control sequences out of 65536+600000
  66 fonts using 15412851 bytes
  60i,9n,73p,388b,888s stack positions out of 5000i,500n,10000p,200000b,100000s
 </System/Library/Fonts/Supplemental/Arial.ttf></System/Library/Fonts/Supplementa
 l/Arial.ttf>
-Output written on sol_sol5.pdf (1 page, 48631 bytes).
+Output written on sol_sol5.pdf (1 page, 48715 bytes).
 
 PDF statistics: 25 PDF objects out of 1000 (max. 8388607)
  15 compressed objects within 1 object stream

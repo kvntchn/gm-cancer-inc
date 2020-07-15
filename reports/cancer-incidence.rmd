@@ -38,9 +38,8 @@ The study population, summarized in Table \ref{tab:tab1}, includes subjects from
 ```{r, echo=F}
 exposure.lag <- 21
 employment_status.lag <- 0
-hwse2.exposure.lag <- 21
 hwse3.additional.lag <- 0
-hwse2.additional.lag <- 20
+hwse2.additional.lag <- 0
 spline_yin <- T
 spline_year <- T
 time_scale <- "age"
@@ -81,21 +80,21 @@ cancers.which <- c(
 
 ```{r, eval=F}
 if (!('cohort_analytic' %in% ls())) {
-	source(here::here('cancer incidence', 'incidence.R'))
+	source(here::here('incidence.R'))
 }
 
 ```
 
 ```{r get.tab1, eval=F}
-source(here::here('reports', 'table1.R'))
+source(here::here('../gm-wrangling/wrangling', 'table1.R'))
 tab1 <- get.tab1(
-	df = as.data.table(as.data.frame(cohort_analytic[year >= 1973 & immortal == 0 & right.censored == 0])),
+	df = as.data.table(as.data.frame(cohort_analytic[(year >= 1985 | (year >= 1973 & plant %in% 1:2)) & immortal == 0 & right.censored == 0])),
 	exposure_lag = exposure.lag,
 	use_finrace = T,
 	incidence = T)
 
 saveRDS(tab1,
-				here::here("./resources/",
+				here::here("./reports/resources/",
 									 paste0("tab1", "_lag", exposure.lag, '.rds')))
 ```
 
@@ -106,7 +105,7 @@ saveRDS(tab1,
 ```{r tab1}
 source(here::here('../gm-wrangling/wrangling', 'table1.R'))
 tab1 <- readRDS(
-	here::here("resources", paste0("tab1", "_lag", exposure.lag, '.rds')))
+	here::here("reports/resources", paste0("tab1", "_lag", exposure.lag, '.rds')))
 
 tab1 <- tab1[, 1:3]
 tab1 <- cbind(rownames(tab1), tab1)
@@ -256,15 +255,15 @@ clean.coef.tab <- function(x,
 \caption{Adjusted hazard ratios for cancer incidence associated with leaving work in the \textbf{UAW-GM Cohort} (HWSE Condition 2).}
 \label{fig:hwse}
 \centering
-\includegraphics{"`r here::here(paste0("reports/resources/hwse 2/Lag ", 1 + hwse2.additional.lag, ifelse(employment_status.lag == 0, "", paste0("/Employment status lagged ", employment_status.lag, " years"))), paste0("hwse", paste0("_sol", messy_sol %/% .01), "_facet.pdf"))`"}
+\includegraphics{"`r here::here(paste0("reports/resources/hwse 2/Lag ", exposure.lag + hwse2.additional.lag, ifelse(employment_status.lag == 0, "", paste0("/Employment status lagged ", employment_status.lag, " years"))), paste0("hwse", paste0("_sol", messy_sol %/% .01), "_facet.pdf"))`"}
 \end{figure}
 
 \end{landscape}
 
 ```{r hwse2}
 hwse2.directory <- gsub("//", "/", here::here(paste(
-	"./resources/",
-	paste0("hwse 2/Lag ", hwse2.exposure.lag,
+	"./reports/resources/",
+	paste0("hwse 2/Lag ", exposure.lag,
 				 ifelse(employment_status.lag != 0,
 				 			 paste0("/Employment status lagged ", employment_status.lag, " years"), "")),
 	ifelse(grepl("age", hwse2.time_scale), "indexed by age", "indexed by calendar"),
@@ -387,8 +386,8 @@ if (table.engine == "xtable") {
 
 ```{r hwse3}
 directory <- gsub("//", "/", here::here(paste(
-	"./resources/hwse 3",
-	paste0("Lag ", 1 + hwse3.additional.lag),
+	"./reports/resources/hwse 3",
+	paste0("Lag ", exposure.lag + hwse3.additional.lag),
 	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
 	sep = "/"
 )))
@@ -427,7 +426,7 @@ coef.tab <- readRDS(
 
 ```{r coxph}
 directory <- gsub("//", "/", here::here(paste(
-	"./resources/",
+	"./reports/resources/",
 	paste0("Lag ", exposure.lag),
 	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
 	sep = "/"
