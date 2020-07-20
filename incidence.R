@@ -9,13 +9,6 @@ library(here)
 # rm(list = ls()[-grep("outcome.selected", ls())])
 # rm(list = ls()[-grep('cohort', ls())])
 
-if (!grepl("gm", getwd(), ignore.case = T)) {
-	if ("here" %in% .packages()) {
-		detach("package:here", unload = T)
-	}
-	setwd('eisen/gm')
-	library(here)
-}
 library(survival)
 
 if (!("exposure.lag" %in% ls())) {
