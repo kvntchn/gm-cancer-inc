@@ -432,6 +432,8 @@ directory <- gsub("//", "/", here::here(paste(
 	sep = "/"
 )))
 
+race_coef.tab <- data.table()
+
 invisible(
 	sapply(cancers.which, function(i = cancers.which[1]) {
 		outcome <- unlist(incidence.key[i,])
@@ -514,6 +516,15 @@ invisible(
 			# )
 		)]
 		
+		# Save conditional estimates for race
+		race_coef.tab <- coef.tab[zoo::na.locf(Covariate) == "Race"]
+		race_coef.tab[,`:=`(Outcome = description)]
+		assign("race_coef.tab",
+					 rbindlist(list(
+			get("race_coef.tab", envir = .GlobalEnv),
+			race_coef.tab
+			)), envir = .GlobalEnv)
+		
 		if (table.engine == "xtable") {
 			cat("\n\\pagebreak")
 			coef.tab[,-'events'] %>% xtable(
@@ -531,6 +542,28 @@ invisible(
 	})
 )
 
+```
+
+\pagebreak
+
+```{r}
+race_coef.tab[,`:=`(
+	Outcome = {
+		Outcome[duplicated(Outcome)] <- NA
+		Outcome}
+)]
+
+race_coef.tab <- race_coef.tab[,c(ncol(race_coef.tab), 1:(ncol(race_coef.tab) - 1)), with = F]
+
+race_coef.tab[,-c("Covariate", 'events')] %>% xtable(
+				align = c("c", "l", "l", rep("r", ncol(.) - 4), "c", "l"),
+				caption = paste0("Adjusted HR estimates for ",
+												 "incidence of the indicated outcome, associated with race. Caution: these estimates are simply the conditional estimates from the previous table.")
+			) %>% print.xtable(
+				# hline.after = c(-1, 0,
+				# 								nrow(.) - c(11),#,9,6,3),
+				# 								nrow(.)),
+				tabular.environment = "longtable")
 ```
 
 ____
