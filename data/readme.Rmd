@@ -57,7 +57,7 @@ cohort_analytic[, `:=`(
 	cum_synthetic = cumsum(synthetic)
 ), by = .(studyno)]
 
-# Upload to Box (about 60.3 MB)
+# Upload to Box as rdata (about 60.3 MB)
 box_save(cohort_analytic,
 				 dir_id = 118903632077,
 				 file_name = "cohort_analytic.rdata",
@@ -66,15 +66,15 @@ box_save(cohort_analytic,
 				 	"of class `data.table` (dimensions: ",
 				 	paste(dim(cohort_analytic), collapse = " x "), ")"))
 
-
 # Simplify data structure
 cohort_analytic[,`:=`(
 	canc_which_first = sapply(canc_which_first, function(x) {
 		paste(x, collapse = ", ")
 	})
 )]
+cohort_analytic <- as.data.frame(cohort_analytic)
 
-# Upload to Box (about 1.7 GB)
+# Upload to Box as csv (about 1.7 GB)
 box_write(cohort_analytic,
 					dir_id = 118903632077,
 					file_name = "cohort_analytic.csv",
@@ -82,11 +82,42 @@ box_write(cohort_analytic,
 						"Analytic data for cancer incidence analyses (dimensions: ",
 						paste(dim(cohort_analytic), collapse = " x "), ")"))
 
+# Sanitize names
+names(cohort_analytic) <- gsub("-|\\.|\\/| ", "_", names(cohort_analytic))
+names(cohort_analytic) <- gsub(",|\\'|\\[|\\]|\\(|\\)", "", names(cohort_analytic))
+names(cohort_analytic)[sapply(names(cohort_analytic), nchar) > 32] <- c(
+	"Accidents",
+	"b_duct_liver_g_bladder_cancers",
+	"bladder_urinary_cancers",
+	"COPD",
+	"Chronic_liver_disease",
+	"nonmalignant_respiratory_dis"
+)
+# Upload to Box as xpt (about 4.1 GB)
+box_write(x = cohort_analytic,
+					dir_id = 118903632077,
+					file_name = "cohort_analytic.xpt",
+					write_fun = haven::write_xpt,
+					description = paste0(
+						"Analytic data for cancer incidence analyses (dimensions: ",
+						paste(dim(cohort_analytic), collapse = " x "), ")"),
+					.name_repair = "universal")
+
+# Upload to Box as sas7bdat (about 5.4 GB)
+box_write(x = cohort_analytic,
+					dir_id = 118903632077,
+					file_name = "cohort_analytic.sas7bdat",
+					write_fun = haven::write_sas,
+					description = paste0(
+						"Analytic data for cancer incidence analyses (dimensions: ",
+						paste(dim(cohort_analytic), collapse = " x "), ")"),
+					.name_repair = "universal")
+
 ```
 
 In the analyses presented in `../reports`, the data were restricted to rows satisfying all of the following: `wh == 1`, `nohist == 0`, `possdiscr_new == 0`, `immortal == 0`, `right.censored == 0`. Note that the data in the current directory were not filtered in this way. Before passing the data to functions for analysis, it would be advisable to check these flags as well as the start/end times for each row. The time indexing variable pairs `age.year1`/`age.year2` and `year1`/`year2` attempt to follow the indexing conventions of the [survival package](https://cran.r-project.org/web/packages/survival/index.html) (see [vignette on time-dependent variables](https://cran.r-project.org/web/packages/survival/vignettes/timedep.pdf)).
 
-The table below provides descriptions of the variables found in the uploaded data. Documentation for most of these variables exist elsewhere on Box.
+Table: The table below provides descriptions of the variables found in the uploaded data. Documentation for most of these variables exist elsewhere on Box. Variable names in `SAS`-formatted files have been sanitized an do not appear as they do here.
 
 --------------------------------------------------------------------------------------------------------------------------------
 Variable                                      Description

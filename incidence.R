@@ -108,7 +108,8 @@ if (!('cohort_analytic' %in% ls())) {
 	cohort_analytic <- cohort_analytic[
 		wh == 1 & nohist == 0 &
 			# cancinccoh15_new == 1 &
-			possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
+			possdiscr_new == 0,
+		# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 }
 
@@ -186,7 +187,9 @@ if (ncol(cohort2) > length(col.names)) {
 	
 	# Drop unnecessary data ####
 	mortality.cohort2 <- mortality.cohort2[
-		wh == 1 & nohist == 0 & possdiscr_new == 0,# & immortal == 0 & right.censored == 0,
+		wh == 1 & nohist == 0 &
+			possdiscr_new == 0,
+		# & immortal == 0 & right.censored == 0,
 		col.names, with = F]
 	
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
