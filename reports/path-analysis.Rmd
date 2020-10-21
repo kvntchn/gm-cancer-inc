@@ -1,0 +1,570 @@
+---
+title: "Cancer incidence and HWSE path analysis"
+subtitle: "GM-UAW Cohort Study"
+# author: "Kevin Chen"
+date: \today
+fontsize: 11pt
+output:
+  pdf_document:
+    latex_engine: lualatex
+    includes:
+      in_header: "~/HeadRs/StatHead.sty"
+    number_sections: false
+    toc: false
+  keep_tex: true
+  # word_document:
+  #   reference_docx: "~/HeadRs/style-guide.docx"
+  # beamer_presentation:
+  #   toc: false
+  #   slide_level: 2
+  #   # latex_engine: lualatex
+  #   includes:
+  #     in_header: "~/HeadRs/BeamerHead.sty"
+bibliography: "`r path.expand('~/eisen/gm/references/gm.bib')`"
+csl: "`r path.expand('~/HeadRs/csl/ama.csl')`"
+geometry: margin=2.54cm
+---
+
+\onehalfspacing
+<!-- \renewcommand{\arraystretch}{1.1} -->
+\fancyhead[R]{}
+\fancyhead[L]{}
+\renewcommand{\headrulewidth}{0pt}
+
+\begin{figure}[H]\begin{center}
+\fbox{
+\begin{tikzpicture}[>= stealth, auto,
+node distance = 3cm, semithick, scale=0.85,
+thick, fill=white, inner sep=5pt]
+\tikzstyle{every state}=[
+shape = rectangle, align = center, draw = none
+]
+\node[state] (employment) {Employment\\Status};
+\node[state] (E1) [below left of=employment, shift=({250:1.3cm})] {Exposure$_{t - 1}$};
+\node[state] (E) [below right of=employment]{Exposure$_{t}$};
+\node[state] (D) [right of=E1, node distance=9cm] {Disease};
+\node[state] (U) [above right of=E] {$U$};
+\path[->] (U) edge (employment);
+\path[->] (E1) edge (employment);
+\path[->] (U) edge (D);
+\path[->] (employment) edge (E);
+\path[->] (E1) edge (E);
+\path[->] (E) edge (D);
+\path[->] (E1) edge (D);
+\end{tikzpicture}
+}
+\end{center}
+\end{figure}
+
+The presence of the healthy worker survivor effect (HWSE) implies the presence of the following three conditions:
+
+1. Leaving work predicts (future) exposure
+2. Leaving work is associated with the disease
+3. Prior exposure predicts predicts leaving work
+
+In occupational cohort studies investigating occupational exposure, the first condition readily satisfied. To assess the presence of conditions 2 and 3, we fit Cox proportional hazards models. Associations between prior exposure and disease are also presented here. In particular, the outcomes under consideration are incidences of stomach cancer, bladder cancer, and non-Hodgkin lymphoma.
+
+\textbf{Data.} The analytic data constitute a subset of the UAW-GM Cohort. Person-time is accrued starting in 1941, or three years after hire, whichever came later. Cancer incidence follow-up begins in 1985 for plant 3 and 1973 for plants 1 and 2. Individuals were considered lost to follow-up if they were still alive and cancer-free at age 108 or greater (the maximum observed age at death). For now, those of unknown race were considered to be white.
+
+\textbf{Metalworking fluid exposure and cancer incidence.} These models are fitted on data including person-time starting in 1985 for plant 3 and 1973 for plants 1 and 2 (since we have SEER data for plants 1 and 2). Follow-up ends at time of cancer incidence, death, loss to follow-up, or December 31, 2015, whichever comes earlier. Cumulative exposure to the three metal working fluid types lagged 21 years are the main exposures of interest. Exposure was categorized into 4 levels including the referent group where possible, and 3 or 2 levels otherwise. The referent group for straight and synthetic metalworking fluids is $0$ mg/m^3^$\cdot$years; that for soluble metalworking fluids is 0--0.05 mg/m^3^$\cdot$years. Covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex. Risk sets were indexed by age.
+
+\textbf{Leaving work and cancer incidence.} As in the metalworking fluid-cancer incidence models, follow-up starts starts in 1985 or 1973, depending on the plant. Follow-up ends at time of cancer incidence, death, reaching 80 years of age, or December 31, 2015, whichever comes earlier. Ending follow-up at 80 years of age is meant to exclude cases that are _not_ thought to be linked to employment status. The main exposure of interest is employment status with no lag and with a lag of 21 years; the levels are employed, left work under the age of 50, and left work over the age of 50. Covariates included in the model are cumulative metalworking fluid exposure (lagged 1 and 22 years) splined calendar year, splined yer of hire, race, plant, and sex. Risk sets were indexed by age.
+
+
+\textbf{Prior exposure and leaving work.} For consistency, follow-up for these models _also_ begins in 1985 or 1973, depending on the plant. The outcome of interest is binary employment status, lagged 21 years. The exposures of interest are cumulative metalworking fluid exposure, lagged 22 years.  Follow-up ends at time of leaving work, death, reaching 80 years of age, or December 31, 2015, whichever comes earlier. Other covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex. Risk sets were indexed by age.
+
+```{r, echo=F}
+exposure.lag <- 21
+employment_status.lag <- c(0, 21)
+hwse3.additional.lag <- 21
+hwse2.additional.lag <- c(0, 21)
+spline_yin <- T
+spline_year <- T
+time_scale <- "age"
+hwse2.time_scale <- "age"
+table.engine <- "xtable"
+messy_sol <- 0.05
+
+```
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = F,
+											warning = F,
+											message = F,
+											cache = F,
+											fig.align = 'center',
+											fig.pos = 'H',
+											results = 'asis')
+
+library(here)
+library(pander)
+library(knitr)
+library(tidyverse)
+library(data.table)
+library(lubridate)
+library(Hmisc)
+library(tikzDevice)
+
+source("~/HeadRs/00-my-theme.R")
+incidence.key <- fread(here::here("resources", 'cancer-key-expanded.tsv'))
+nevent <- readRDS(here::here("resources", "nevent.rds"))
+cancers.which <- grep("stomach|bladder|hodgkin", incidence.key$description, ignore.case = T)
+
+```
+
+```{r, eval=F}
+if (!('cohort_analytic' %in% ls())) {
+	source(here::here('incidence.R'))
+}
+
+```
+
+```{r get.tab1, eval=F}
+source(here::here('../gm-wrangling/wrangling', 'table1.R'))
+tab1 <- get.tab1(
+	df = as.data.table(as.data.frame(cohort_analytic[(year >= 1985 | (year >= 1973 & plant %in% 1:2)) & immortal == 0 & right.censored == 0])),
+	exposure_lag = exposure.lag,
+	use_finrace = T,
+	incidence = T)
+
+saveRDS(tab1,
+				here::here("./reports/resources/",
+									 paste0("tab1", "_lag", exposure.lag, '.rds')))
+```
+
+\begin{table}[H]
+\caption{Summary of population characteristics. Follow-up starts in 1973 for plants 1 and 2, and 1985 for plant 3. Follow-up ends in 2015.}
+\label{tab:tab1}
+\centering
+```{r tab1}
+source(here::here('../gm-wrangling/wrangling', 'table1.R'))
+tab1 <- readRDS(
+	here::here("reports/resources", paste0("tab1", "_lag", exposure.lag, '.rds')))
+
+tab1 <- tab1[, 1:3]
+tab1 <- cbind(rownames(tab1), tab1)
+
+colnames(tab1)[1:4] <- c(" ", "$n$", "$p$", "  ")
+
+description.width <- 8
+column.width <- 1.75
+table.break <- "Years of follow-"
+
+if (table.engine == 'xtable') {
+	tab1 %>% as.data.frame(check.names = F) %>% xtable(
+		label = "tab:tab1",
+		align = paste0('cp{', description.width, 'cm}',
+									 paste0(rep(
+									 	paste0('R{', column.width, 'cm}'), ncol(.) - 1
+									 ),
+									 collapse = ''))
+	) %>% print(
+		comment = F,
+		add.to.row = list(
+			pos = list(grep(table.break, rownames(tab1)) - 1, nrow(.)),
+			command = c(
+				paste0('\\hline ', '& Median & 25\\textsuperscript{th} \\%tile & 75\\textsuperscript{th} \\%tile \\\\ \n'),
+				paste0(
+					'\\hline ',
+					'\\multicolumn{',
+					ncol(.),
+					'}{p{',
+					description.width + ncol(tab1) * column.width + 1,
+					'cm}}{\\footnotesize{',
+					'$^\\natural$ Some individuals worked at several sites; plant indicates the site of longest work record time.',
+					'}}\\\\',
+					'\\multicolumn{',
+					ncol(.),
+					'}{p{',
+					description.width + ncol(tab1) * column.width + 1,
+					'cm}}{\\footnotesize{',
+					'$^*$ Among those with known date of worker exit.',
+					'}}\\\\',
+					'\\multicolumn{',
+					ncol(.),
+					'}{p{',
+					description.width + ncol(tab1) * column.width + 1,
+					'cm}}{\\footnotesize{',
+					'$^\\sharp$ Summary statistics calculated for ever-exposed individuals at end of follow-up only. Exposures were lagged ', exposure.lag, ' years.',
+					'}}\\\\'
+				)
+			)
+		)
+	)
+} else {
+	# Remove/replace LaTeX commands
+	rownames(tab1) <- gsub(
+		"\\\\hspace\\{.*\\}", "&#9;", rownames(tab1))
+	rownames(tab1) <- gsub(
+		"\\\\hline ", "", rownames(tab1))
+	# Footnotes
+	# rownames(tab1) <- gsub(
+	# 	"\\$\\^\\\\flat\\$", "$^1$", rownames(tab1))
+	rownames(tab1) <- gsub(
+		"\\$\\^\\\\sharp\\$", "$^3$", rownames(tab1))
+	rownames(tab1) <- gsub(
+		"\\$\\^\\*\\$", "$^2$", rownames(tab1))
+	rownames(tab1) <- gsub(
+		"\\$\\^\\\\natural\\$", "$^1$", rownames(tab1))
+	
+	tab1 <- rbind(
+		tab1[1:(which(grepl(table.break, rownames(tab1))) - 1),],
+		c("Median", "Q1", "Q3"),
+		tab1[which(grepl(table.break, rownames(tab1))):nrow(tab1),]
+	)
+	
+	pander(tab1,
+				 justify = c('left', 'right', 'right', 'right'),
+				 emphasize.rownames = F,
+				 missing = "&nbsp;",
+				 caption = tab1.cap
+	) %>% cat
+	
+	paste0(
+		'^1^ For individuals who worked at several plants, plant was taken to be the site where they accrued the most work record time.\n\n',
+		'^2^ Among those with known date of worker exit.\n\n',
+		'^3^ Summary statistics calculated for exposed individuals at end of follow-up only. Exposures were lagged ', exposure.lag, ' years\n\n') %>% cat
+}
+
+```
+\end{table}
+
+```{r clean_table}
+clean.coef.tab <- function(x,
+													 table.engine = "xtable",
+													 additional.lag = 0) {
+	tmp.tab <- as.data.table(as.data.frame(x))
+	if (table.engine == 'xtable') { 
+		tmp.tab[is.na(`(95% CI)`), `(95% CI)` := "\\multicolumn{1}{c}{--}"]
+		names(tmp.tab) <- c(
+			"Covariate", "level", "$n$", "HR", "(95\\% CI)", "$p$", 'events')
+	} else {
+		tmp.tab[is.na(`(95% CI)`), `(95% CI)` := "$-$"]
+	}
+
+	tmp.tab[!is.na(as.numeric(`$p$`)),`:=`(
+		` ` = ifelse(`$p$` < 0.05 & !is.na(as.numeric(`$p$`)), "$*$", "")
+	)]
+
+	if (table.engine == 'xtable') {
+		tmp.tab[!grepl("0.00|^0$", `$p$`) & !is.na(`$p$`), `:=`(
+			`$p$` = paste0("", `$p$`, "\\phantom{0}"))]}
+	tmp.tab$`$p$` <- gsub("0.00|^0$", "< 0.005", tmp.tab$`$p$`)
+
+	tmp.tab$`$n$` <- as.character(tmp.tab$`$n$`)
+	
+	return(tmp.tab)
+}
+
+```
+
+
+```{r hwse2}
+for (j in 1:2) {
+hwse2.directory <- gsub("//", "/", here::here(paste(
+	"./reports/resources/",
+	paste0("hwse 2/Lag ", 1 + hwse2.additional.lag[j],
+				 ifelse(employment_status.lag[j] != 0,
+				 			 paste0("/Employment status lagged ", employment_status.lag[j], " years"), "")),
+	ifelse(grepl("age", hwse2.time_scale), "indexed by age", "indexed by calendar"),
+	sep = "/"
+)))
+
+rbindlist(
+	lapply(cancers.which, function(i = cancers.which[1]) {
+		outcome <- unlist(incidence.key[i,])
+		# Exposure-incidence model
+		code <- outcome[1]; description <- outcome[2]
+		
+		file.prefix <- paste0(
+	code,
+	ifelse(is.finite(messy_sol),
+				 paste0("_sol", messy_sol %/% .01), ""),
+	ifelse(spline_year,
+				 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+				 ifelse(spline_yin, paste0("_splinedyin"), ""))
+)
+		
+		# HWSE 2 model
+		tab.names <- c("hwse2.coef.tab",
+									 "hwse2_50.coef.tab",
+									 "hwse2_55.coef.tab",
+									 "hwse2_60.coef.tab"
+									 )
+		dir.names <- c("Binary", paste("Age", seq(50, 60, 5))
+									 )
+		invisible(
+		sapply(1:length(tab.names), function (i = 1) {
+			assign(tab.names[i],
+						 readRDS(
+						 	paste0(hwse2.directory, "/",
+						 				 dir.names[i], "/",
+						 		code,
+						 		ifelse(is.finite(messy_sol),
+				 paste0("_sol", messy_sol %/% .01), ""),
+						 		ifelse(spline_year,
+						 					 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+						 					 ifelse(spline_yin, paste0("_splinedyin"))),
+							 			 ".tab.rds")), envir = .GlobalEnv)
+		}
+		))
+		
+		coef.tab <- rbindlist(list(
+			clean.coef.tab(hwse2.coef.tab[1:2,]),
+			clean.coef.tab(hwse2_50.coef.tab[1:3,]),
+			clean.coef.tab(hwse2_55.coef.tab[1:3,]),
+			clean.coef.tab(hwse2_60.coef.tab[1:3,])
+		))
+		
+		# Clean up covariate name
+		coef.tab[Covariate == "Cumulative soluble 5",
+						 Covariate := "Cumulative soluble"]
+		
+		coef.tab[grepl("Employment status", Covariate), `:=`(
+						 Covariate = c("Employment status", rep(
+						 	# "\\cline{2-7}"
+						 	NA, .N - 1))
+						 )]
+		
+		# Number of digits
+		coef.tab[nchar(gsub("\\$", "", HR)) > 4, `:=`(
+			HR = paste0("$", format(as.numeric(gsub("\\$", "", HR)), scientific = T, digits = 3), "$"),
+			`(95\\% CI)` = "\\multicolumn{1}{c}{--}"
+			# 	paste0(
+			# 	"($",
+			# 	format(as.numeric(substring(
+			# 		`(95\\% CI)`,
+			# 		unlist(gregexpr("\\(", `(95\\% CI)`)) + 1,
+			# 		unlist(gregexpr("\\,\\\\", `(95\\% CI)`)) - 1)),
+			# 		scientific = T, digits = 3), ",\\,",
+			# 	format(as.numeric(substring(
+			# 	`(95\\% CI)`,
+			# 	unlist(gregexpr(",\\\\,", `(95\\% CI)`)) + 3,
+			# 	unlist(gregexpr("\\)", `(95\\% CI)`)) - 1)),
+			# 	scientific = T, digits = 3),
+			# 	")$"
+			# )
+		)]
+		
+		# Remove duplicate rows
+		coef.tab[duplicated(level), (names(coef.tab)[-1]):=(
+			lapply(names(coef.tab)[-1], function(x) {
+				NA
+			}))]
+		
+		names(coef.tab)[1] <- "Outcome"
+		coef.tab$Outcome <- NA
+		
+		rbindlist(list(
+			data.table(
+			Outcome = paste0(ifelse(i != cancers.which[1], "\\\\\n", ""),
+			"\\multicolumn{6}{l}{",
+			description, " (", coef.tab$events[1], " events)",
+			"}\\\\\n%")),
+			coef.tab
+			), fill = T)
+		
+	})
+) -> coef.tab
+
+names(coef.tab)[1:2] <- c(" ", "  ")
+
+if (table.engine == "xtable") {
+			cat("\n\\pagebreak")
+			coef.tab[,-'events'] %>% xtable(
+				align = c("c", "l", "l", rep("r", ncol(.) - 3), "c"),
+				caption = paste0("Adjusted HR estimates for cancer incidence and employment status",
+												 ifelse(employment_status.lag[j] == 0, ".", paste0("lagged by ",
+												 employment_status.lag[j], " years.")))
+			) %>% print.xtable(
+				tabular.environment = "longtable")
+}
+}
+
+```
+
+\newpage
+
+```{r hwse3}
+directory <- gsub("//", "/", here::here(paste(
+	"./reports/resources/hwse 3",
+	paste0("Lag ", exposure.lag + hwse3.additional.lag),
+	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
+	sep = "/"
+)))
+
+coef.tab <- readRDS(
+	paste0(directory, "/",
+		gsub("^_", "", paste0(
+			ifelse(is.finite(messy_sol),
+						 paste0("_sol", messy_sol %/% .01), ""),
+			ifelse(spline_year,
+						 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+						 ifelse(spline_yin, paste0("_splinedyin"), ""))
+		, ".tab.rds"))))
+
+		coef.tab <- clean.coef.tab(coef.tab)
+		
+		# Clean up covariate name
+		coef.tab[Covariate == "Cumulative soluble 5",
+						 Covariate := "Cumulative soluble"]
+		
+		coef.tab[grepl("Employment status", Covariate), `:=`(
+						 Covariate = c("Employment status", rep("\\cline{2-7}", .N - 1))
+						 )]
+		
+		if (table.engine == "xtable") {
+			cat("\n\\pagebreak")
+			coef.tab[,-'events'] %>% xtable(
+				align = c("c", "l", "l", rep("r", ncol(.) - 3), "c"),
+				caption = paste0("Adjusted HR estimates for \\textbf{leaving work}.")
+			) %>% print.xtable(
+				tabular.environment = "longtable")
+		}
+		
+
+```
+
+```{r coxph}
+directory <- gsub("//", "/", here::here(paste(
+	"./reports/resources/",
+	paste0("Lag ", exposure.lag),
+	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
+	sep = "/"
+)))
+
+race_coef.tab <- data.table()
+
+invisible(
+	sapply(cancers.which, function(i = cancers.which[1]) {
+		outcome <- unlist(incidence.key[i,])
+		# Exposure-incidence model
+		code <- outcome[1]; description <- outcome[2]
+		
+		file.prefix <- paste0(
+	code,
+	ifelse(is.finite(messy_sol),
+				 paste0("_sol", messy_sol %/% .01), ""),
+	ifelse(spline_year,
+				 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+				 ifelse(spline_yin, paste0("_splinedyin"), ""))
+)
+		
+		coef.tab <- readRDS(
+				paste0(directory, "/",
+				code, "_sol5",
+							 ifelse(spline_year,
+							 			 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+							 			 ifelse(spline_yin, paste0("_splinedyin"), "")),
+							 ".tab.rds"))
+		# HWSE 2 model
+		tab.names <- c("hwse2.coef.tab",
+									 "hwse2_50.coef.tab",
+									 "hwse2_55.coef.tab",
+									 "hwse2_60.coef.tab"
+									 )
+		dir.names <- c("Binary", paste("Age", seq(50, 60, 5))
+									 )
+		# invisible(
+		# sapply(1:length(tab.names), function (i = 1) {
+		# 	assign(tab.names[i],
+		# 				 readRDS(
+		# 				 	paste0(hwse2.directory, "/",
+		# 				 				 dir.names[i], "/",
+		# 				 		code,
+		# 				 		ifelse(is.finite(messy_sol),
+		# 		 paste0("_sol", messy_sol %/% .01), ""),
+		# 				 		ifelse(spline_year,
+		# 				 					 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+		# 				 					 ifelse(spline_yin, paste0("_splinedyin"))),
+		# 					 			 ".tab.rds")), envir = .GlobalEnv)
+		# }
+		# ))
+		
+		coef.tab <- rbindlist(list(
+			clean.coef.tab(coef.tab)
+			# clean.coef.tab(hwse2.coef.tab[1:2,]),
+			# clean.coef.tab(hwse2_50.coef.tab[1:3,]),
+			# clean.coef.tab(hwse2_55.coef.tab[1:3,]),
+			# clean.coef.tab(hwse2_60.coef.tab[1:3,])
+		))
+		
+		# Clean up covariate name
+		coef.tab[Covariate == "Cumulative soluble 5",
+						 Covariate := "Cumulative soluble"]
+		
+		coef.tab[grepl("Employment status", Covariate), `:=`(
+						 Covariate = c("Employment status", rep("\\cline{2-7}", .N - 1))
+						 )]
+		
+		# Number of digits
+		coef.tab[nchar(gsub("\\$", "", HR)) > 4, `:=`(
+			HR = paste0("$", format(as.numeric(gsub("\\$", "", HR)), scientific = T, digits = 3), "$"),
+			`(95\\% CI)` = "\\multicolumn{1}{c}{--}"
+			# 	paste0(
+			# 	"($",
+			# 	format(as.numeric(substring(
+			# 		`(95\\% CI)`,
+			# 		unlist(gregexpr("\\(", `(95\\% CI)`)) + 1,
+			# 		unlist(gregexpr("\\,\\\\", `(95\\% CI)`)) - 1)),
+			# 		scientific = T, digits = 3), ",\\,",
+			# 	format(as.numeric(substring(
+			# 	`(95\\% CI)`,
+			# 	unlist(gregexpr(",\\\\,", `(95\\% CI)`)) + 3,
+			# 	unlist(gregexpr("\\)", `(95\\% CI)`)) - 1)),
+			# 	scientific = T, digits = 3),
+			# 	")$"
+			# )
+		)]
+		
+		# Save conditional estimates for race
+		race_coef.tab <- coef.tab[zoo::na.locf(Covariate) == "Race"]
+		race_coef.tab[,`:=`(Outcome = description)]
+		assign("race_coef.tab",
+					 rbindlist(list(
+			get("race_coef.tab", envir = .GlobalEnv),
+			race_coef.tab
+			)), envir = .GlobalEnv)
+		
+		if (table.engine == "xtable") {
+			cat("\n\\pagebreak")
+			coef.tab[,-'events'] %>% xtable(
+				align = c("c", "l", "l", rep("r", ncol(.) - 3), "c"),
+				caption = paste0("Adjusted HR estimates for ",
+												 ifelse(i <= 31, "incidence of", "death due to"),
+												 " \\textbf{", tolower(description), "} ($n = ", unique(coef.tab$events)[1], "$).")
+			) %>% print.xtable(
+				# hline.after = c(-1, 0,
+				# 								nrow(.) - c(11),#,9,6,3),
+				# 								nrow(.)),
+				tabular.environment = "longtable")
+		}
+		
+	})
+)
+
+```
+
+\pagebreak
+
+```{r}
+race_coef.tab[,`:=`(
+	Outcome = {
+		Outcome[duplicated(Outcome)] <- NA
+		Outcome}
+)]
+
+race_coef.tab <- race_coef.tab[,c(ncol(race_coef.tab), 1:(ncol(race_coef.tab) - 1)), with = F]
+
+race_coef.tab[,-c("Covariate", 'events')] %>% xtable(
+				align = c("c", "l", "l", rep("r", ncol(.) - 4), "c", "l"),
+				caption = paste0("Adjusted HR estimates for ",
+												 "incidence of the indicated outcome, associated with race. Caution: these estimates are simply the conditional estimates from the previous table.")
+			) %>% print.xtable(
+				# hline.after = c(-1, 0,
+				# 								nrow(.) - c(11),#,9,6,3),
+				# 								nrow(.)),
+				tabular.environment = "longtable")
+```
+
+____

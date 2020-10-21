@@ -124,7 +124,7 @@ if (table.engine == 'xtable') {
 									 	paste0('R{', column.width, 'cm}'), ncol(.) - 1
 									 ),
 									 collapse = ''))
-	) %>% print.xtable(
+	) %>% print(
 		comment = F,
 		add.to.row = list(
 			pos = list(grep(table.break, rownames(tab1)) - 1, nrow(.)),
