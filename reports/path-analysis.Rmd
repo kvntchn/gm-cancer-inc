@@ -1,9 +1,9 @@
 ---
-title: "Cancer incidence and HWSE path analysis"
-subtitle: "GM-UAW Cohort Study"
+title: "HWSE path analysis"
+subtitle: "Stomach cancer, bladder cancer, and non-Hodgkin Lymphoma"
 # author: "Kevin Chen"
 date: \today
-fontsize: 11pt
+fontsize: 10pt
 output:
   pdf_document:
     latex_engine: lualatex
@@ -66,12 +66,40 @@ In occupational cohort studies investigating occupational exposure, the first co
 
 \textbf{Data.} The analytic data constitute a subset of the UAW-GM Cohort. Person-time is accrued starting in 1941, or three years after hire, whichever came later. Cancer incidence follow-up begins in 1985 for plant 3 and 1973 for plants 1 and 2. Individuals were considered lost to follow-up if they were still alive and cancer-free at age 108 or greater (the maximum observed age at death). For now, those of unknown race were considered to be white.
 
-\textbf{Metalworking fluid exposure and cancer incidence.} These models are fitted on data including person-time starting in 1985 for plant 3 and 1973 for plants 1 and 2 (since we have SEER data for plants 1 and 2). Follow-up ends at time of cancer incidence, death, loss to follow-up, or December 31, 2015, whichever comes earlier. Cumulative exposure to the three metal working fluid types lagged 21 years are the main exposures of interest. Exposure was categorized into 4 levels including the referent group where possible, and 3 or 2 levels otherwise. The referent group for straight and synthetic metalworking fluids is $0$ mg/m^3^$\cdot$years; that for soluble metalworking fluids is 0--0.05 mg/m^3^$\cdot$years. Covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex. Risk sets were indexed by age.
+\textbf{Metalworking fluid exposure and cancer incidence.}
 
-\textbf{Leaving work and cancer incidence.} As in the metalworking fluid-cancer incidence models, follow-up starts starts in 1985 or 1973, depending on the plant. Follow-up ends at time of cancer incidence, death, reaching 80 years of age, or December 31, 2015, whichever comes earlier. Ending follow-up at 80 years of age is meant to exclude cases that are _not_ thought to be linked to employment status. The main exposure of interest is employment status with no lag and with a lag of 21 years; the levels are employed, left work under the age of 50, and left work over the age of 50. Covariates included in the model are cumulative metalworking fluid exposure (lagged 1 and 22 years) splined calendar year, splined yer of hire, race, plant, and sex. Risk sets were indexed by age.
+- Person-time starts in 1985 for plant 3 and 1973 for plants 1 and 2 (since we have SEER data for plants 1 and 2).
+- Follow-up ends at time of cancer incidence, death, loss to follow-up, or December 31, 2015, whichever comes earlier.
+- Cumulative exposure to the three metal working fluid types lagged 21 years are the main exposures of interest.
+	- Exposure was categorized into 4 levels including the referent group where possible, and 3 or 2 levels otherwise.
+	- The referent group for straight and synthetic metalworking fluids is $0$ mg/m^3^$\cdot$years
+	- that for soluble metalworking fluids is 0--0.05 mg/m^3^$\cdot$years.
+- Covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex.
+- Risk sets were indexed by age.
 
+\textbf{Leaving work and cancer incidence.}
 
-\textbf{Prior exposure and leaving work.} For consistency, follow-up for these models _also_ begins in 1985 or 1973, depending on the plant. The outcome of interest is binary employment status, lagged 21 years. The exposures of interest are cumulative metalworking fluid exposure, lagged 22 years.  Follow-up ends at time of leaving work, death, reaching 80 years of age, or December 31, 2015, whichever comes earlier. Other covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex. Risk sets were indexed by age.
+- As in the metalworking fluid-cancer incidence models, follow-up starts starts in 1985 or 1973, depending on the plant.
+- Follow-up ends at time of cancer incidence, death, reaching 80 years of age, censoring due to end of employment records, or December 31, 2015, whichever comes earlier.
+	- Ending follow-up at 80 years of age is meant to exclude cases that are _not_ thought to be linked to employment status.
+- The main exposure of interest is employment status with no lag and with a lag of 21 years; the levels are:
+	- employed,
+	- left work under the age of 50, and
+	- left work over the age of 50.
+- When employment status _was not_ lagged, those who will still at work on January 1, 1995 were censored on that day
+- When employment status _was_ lagged, the censor date was lagged by the same amount.
+- Covariates included in the model are cumulative metalworking fluid exposure (lagged 1 and 22 years) splined calendar year, splined yer of hire, race, plant, and sex.
+- Risk sets were indexed by age.
+
+\textbf{Prior exposure and leaving work.}
+
+- For consistency, follow-up for these models _also_ begins in 1985 or 1973, depending on the plant.
+- The outcome of interest is binary employment status, lagged 21 years.
+	- Those who will still at work on January 1, 1995 were censored on January 1, 2016.
+- The exposures of interest are cumulative metalworking fluid exposure, lagged 22 years.
+- Follow-up ends at time of leaving work, death, reaching 80 years of age, censoring due to end of employment records, or December 31, 2015, whichever comes earlier.
+- Other covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex.
+- Risk sets were indexed by age.
 
 ```{r, echo=F}
 exposure.lag <- 21
@@ -97,8 +125,6 @@ knitr::opts_chunk$set(echo = F,
 											results = 'asis')
 
 library(here)
-library(pander)
-library(knitr)
 library(tidyverse)
 library(data.table)
 library(lubridate)
@@ -374,7 +400,7 @@ if (table.engine == "xtable") {
 			coef.tab[,-'events'] %>% xtable(
 				align = c("c", "l", "l", rep("r", ncol(.) - 3), "c"),
 				caption = paste0("Adjusted HR estimates for cancer incidence and employment status",
-												 ifelse(employment_status.lag[j] == 0, ".", paste0("lagged by ",
+												 ifelse(employment_status.lag[j] == 0, ".", paste0(" lagged by ",
 												 employment_status.lag[j], " years.")))
 			) %>% print.xtable(
 				tabular.environment = "longtable")
@@ -388,7 +414,9 @@ if (table.engine == "xtable") {
 ```{r hwse3}
 directory <- gsub("//", "/", here::here(paste(
 	"./reports/resources/hwse 3",
-	paste0("Lag ", exposure.lag + hwse3.additional.lag),
+	paste0("Lag ", 1 + hwse3.additional.lag),
+	ifelse(employment_status.lag[2] == 0, "",
+								paste0("employment status lagged ", employment_status.lag[2], " years")),
 	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
 	sep = "/"
 )))
@@ -417,7 +445,9 @@ coef.tab <- readRDS(
 			cat("\n\\pagebreak")
 			coef.tab[,-'events'] %>% xtable(
 				align = c("c", "l", "l", rep("r", ncol(.) - 3), "c"),
-				caption = paste0("Adjusted HR estimates for \\textbf{leaving work}.")
+				caption = paste0("Adjusted HR estimates for \\textbf{leaving work}. ",
+																					ifelse(employment_status.lag[2] == 0, "",
+																												paste0("Leaving work was lagged ", employment_status.lag[2], " years.")))
 			) %>% print.xtable(
 				tabular.environment = "longtable")
 		}
@@ -544,27 +574,3 @@ invisible(
 )
 
 ```
-
-\pagebreak
-
-```{r}
-race_coef.tab[,`:=`(
-	Outcome = {
-		Outcome[duplicated(Outcome)] <- NA
-		Outcome}
-)]
-
-race_coef.tab <- race_coef.tab[,c(ncol(race_coef.tab), 1:(ncol(race_coef.tab) - 1)), with = F]
-
-race_coef.tab[,-c("Covariate", 'events')] %>% xtable(
-				align = c("c", "l", "l", rep("r", ncol(.) - 4), "c", "l"),
-				caption = paste0("Adjusted HR estimates for ",
-												 "incidence of the indicated outcome, associated with race. Caution: these estimates are simply the conditional estimates from the previous table.")
-			) %>% print.xtable(
-				# hline.after = c(-1, 0,
-				# 								nrow(.) - c(11),#,9,6,3),
-				# 								nrow(.)),
-				tabular.environment = "longtable")
-```
-
-____
