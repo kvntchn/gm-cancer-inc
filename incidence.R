@@ -191,39 +191,39 @@ if (get.cohort2 & !("cohort2" %in% ls())) {
 	# 	yob + years(80)
 	# ), 1, min, na.rm = T)
 	# )]
-	mortality.cohort2 <- mortality.cohort2[year <= year(yoc)]
-	mortality.cohort2[year == year(yoc), `:=`(age.year2 = time_length(difftime(as.Date(
-		apply(data.frame(
-			as.Date(paste0(year.max + 1, "-01-01")),
-			yod + days(1),
-			yoc + days(1)
-		), 1, min, na.rm = T)
-	), yob), 'day'))]
+	# mortality.cohort2 <- mortality.cohort2[year <= year(yoc) | is.na(yoc)]
+	# mortality.cohort2[year == year(yoc), `:=`(age.year2 = time_length(difftime(as.Date(
+	# 	apply(data.frame(
+	# 		as.Date(paste0(year.max + 1, "-01-01")),
+	# 		yod + days(1),
+	# 		yoc + days(1)
+	# 	), 1, min, na.rm = T)
+	# ), yob), 'day'))]
 
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-	# Censor at 80 or first cancer
-	cohort2[, `:=`(yoc = as.Date(apply(data.frame(
-		yoc,
-		# yob + years(80),
-		ddiag_first
-	), 1, min, na.rm = T)
-	))]
-	# Anybody enter cohort too late?
-	cohort2 <- cohort2[yin + years(3) < as.Date(apply(data.frame(
-		yoc,
-		# yob + years(80),
-		ddiag_first
-	), 1, min, na.rm = T)
-	)]
-	cohort2 <- cohort2[year <= year(yoc)]
-	cohort2[year == year(yoc), `:=`(age.year2 = time_length(difftime(as.Date(
-		apply(data.frame(
-			as.Date(paste0(year.max + 1, "-01-01")),
-			yod + days(1),
-			yoc + days(1)
-		), 1, min, na.rm = T)
-	), yob), 'day'))]
+	# # Censor at 80 or first cancer
+	# cohort2[, `:=`(yoc = as.Date(apply(data.frame(
+	# 	yoc,
+	# 	yob + years(80),
+	# 	ddiag_first
+	# ), 1, min, na.rm = T)
+	# ))]
+	# # Anybody enter cohort too late?
+	# cohort2 <- cohort2[yin + years(3) < as.Date(apply(data.frame(
+	# 																					yoc,
+	# 																					yob + years(80),
+	# 																					ddiag_first
+	# 																					), 1, min, na.rm = T)
+	# 																					)]
+	# cohort2 <- cohort2[year <= year(yoc) | is.na(yoc)]
+	# cohort2[year == year(yoc), `:=`(age.year2 = time_length(difftime(as.Date(
+	# 	apply(data.frame(
+	# 		as.Date(paste0(year.max + 1, "-01-01")),
+	# 		yod + days(1),
+	# 		yoc + days(1)
+	# 	), 1, min, na.rm = T)
+	# ), yob), 'day'))]
 
 } # End get HWSE 2 analytic data script
 
