@@ -179,18 +179,18 @@ if (get.cohort2 & !("cohort2" %in% ls())) {
 	# Mortality cohort for positive/negative controls ####
 	mortality.cohort2 <- as.data.table(as.data.frame(cohort2))
 
-	# Censor at 80
-	mortality.cohort2[, `:=`(yoc = as.Date(apply(data.frame(
-		yoc,
-		yob + years(80)
-	), 1, min, na.rm = T)
-	))]
-	# Anybody enter cohort too late?
-	mortality.cohort2 <- mortality.cohort2[yin + years(3) < as.Date(apply(data.frame(
-		yoc,
-		yob + years(80)
-	), 1, min, na.rm = T)
-	)]
+	# # Censor at 80
+	# mortality.cohort2[, `:=`(yoc = as.Date(apply(data.frame(
+	# 	yoc,
+	# 	yob + years(80)
+	# ), 1, min, na.rm = T)
+	# ))]
+	# # Anybody enter cohort too late?
+	# mortality.cohort2 <- mortality.cohort2[yin + years(3) < as.Date(apply(data.frame(
+	# 	yoc,
+	# 	yob + years(80)
+	# ), 1, min, na.rm = T)
+	# )]
 	mortality.cohort2 <- mortality.cohort2[year <= year(yoc)]
 	mortality.cohort2[year == year(yoc), `:=`(age.year2 = time_length(difftime(as.Date(
 		apply(data.frame(
@@ -205,14 +205,14 @@ if (get.cohort2 & !("cohort2" %in% ls())) {
 	# Censor at 80 or first cancer
 	cohort2[, `:=`(yoc = as.Date(apply(data.frame(
 		yoc,
-		yob + years(80),
+		# yob + years(80),
 		ddiag_first
 	), 1, min, na.rm = T)
 	))]
 	# Anybody enter cohort too late?
 	cohort2 <- cohort2[yin + years(3) < as.Date(apply(data.frame(
 		yoc,
-		yob + years(80),
+		# yob + years(80),
 		ddiag_first
 	), 1, min, na.rm = T)
 	)]
@@ -1185,7 +1185,7 @@ get.hwse2.coxph <- function(
 			sapply(directory.name, dir.create, showWarnings = F, recursive = T)
 
 			# Fit model ####
-			invisible(sapply(1:length(basic_formula), function(j) {
+			invisible(sapply(1:length(basic_formula), function(j = 1) {
 				tmp.coxph <- coxph(
 					as.formula(basic_formula[[j]]),
 					data = {
@@ -1484,7 +1484,7 @@ get.coef <- function(
 		outcomes <- 1
 	}
 
-	invisible(sapply(outcomes, function(i = 25) {
+	invisible(sapply(outcomes, function(i = outcomes[1]) {
 
 		code <- unlist(incidence.key[i, 1])
 		description <- unlist(incidence.key[i, 2])

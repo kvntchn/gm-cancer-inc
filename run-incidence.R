@@ -35,6 +35,8 @@ for (j in 1:2) {
 get.hwse2.coxph(
 	# outcomes = c(25, 31),
 	run_model = T,
+	spline_year = T,
+	spline_yin = T,
 	time_scale = "age",
 	additional.lag = additional.lag[j],
 	employment_status.lag = employment_status.lag[j]
