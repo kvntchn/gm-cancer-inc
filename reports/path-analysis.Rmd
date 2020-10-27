@@ -80,8 +80,7 @@ In occupational cohort studies investigating occupational exposure, the first co
 \textbf{Leaving work and cancer incidence.}
 
 - As in the metalworking fluid-cancer incidence models, follow-up starts starts in 1985 or 1973, depending on the plant.
-- Follow-up ends at time of cancer incidence, death, reaching 80 years of age, censoring due to end of employment records, or December 31, 2015, whichever comes earlier.
-	- Ending follow-up at 80 years of age is meant to exclude cases that are _not_ thought to be linked to employment status.
+- Follow-up ends at time of cancer incidence, death, censoring due to end of employment records, or December 31, 2015, whichever comes earlier.
 - The main exposure of interest is employment status with no lag and with a lag of 21 years; the levels are:
 	- employed,
 	- left work under the age of 50, and
@@ -97,7 +96,7 @@ In occupational cohort studies investigating occupational exposure, the first co
 - The outcome of interest is binary employment status, lagged 21 years.
 	- Those who will still at work on January 1, 1995 were censored on January 1, 2016.
 - The exposures of interest are cumulative metalworking fluid exposure, lagged 22 years.
-- Follow-up ends at time of leaving work, death, reaching 80 years of age, censoring due to end of employment records, or December 31, 2015, whichever comes earlier.
+- Follow-up ends at time of leaving work, death, censoring due to end of employment records, or December 31, 2015, whichever comes earlier.
 - Other covariates included in the model are splined calendar year, splined year of hire, race, plant, and sex.
 - Risk sets were indexed by age.
 
