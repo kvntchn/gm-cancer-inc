@@ -12,9 +12,10 @@ library(here)
 # Specify YOUT ####
 yout.which <- "yout"
 source(here::here("incidence.R"))
-employment_status.lag <- c(0, 21)
-additional.lag <- c(0, 21)
-outcomes.which <- grep("stomach|bladder|hodgkin", incidence.key$description, ignore.case = T)
+employment_status.lag <- c(0)
+additional.lag <- c(0)
+outcomes.which <- grep("stomach|bladder|hodgkin|lung|rectal|colon|breast|all", incidence.key$description, ignore.case = T)
+# outcomes.which <- grep("lung|rectal|colon|breast|all", incidence.key$description, ignore.case = T)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # # Run model ####
@@ -31,19 +32,20 @@ outcomes.which <- grep("stomach|bladder|hodgkin", incidence.key$description, ign
 # rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
 
  # HWSE 2 with Messy soluble ####
-for (j in 1:2) {
+for (j in 1:length(employment_status.lag)) {
 get.hwse2.coxph(
-	# outcomes = c(25, 31),
+	# outcomes = grep("lung|rectal|colon|breast|all", incidence.key$description, ignore.case = T),
 	run_model = T,
 	spline_year = T,
 	spline_yin = T,
 	time_scale = "age",
 	additional.lag = additional.lag[j],
-	employment_status.lag = employment_status.lag[j]
+	employment_status.lag = employment_status.lag[j],
+	year.max = 1994
 )
 sapply(c("Binary", paste("Age", seq(50, 60, 5))),
 			 function(x) {get.coef(
-			 	# outcomes = c(25, 31),
+			 	# outcomes = grep("lung|rectal|colon|breast|all", incidence.key$description, ignore.case = T),
 			 	new_dat = F,
 			 	time_scale = "age",
 			 	employment.which = x,
@@ -51,17 +53,20 @@ sapply(c("Binary", paste("Age", seq(50, 60, 5))),
 			 	spline_yin = T,
 			 	hwse2 = T,
 			 	additional.lag = additional.lag[j],
-			 	employment_status.lag = employment_status.lag[j])})
+			 	employment_status.lag = employment_status.lag[j],
+			 	year.max = 1994)})
 }
 
 #  HWSE 3 with Messy soluble ####
 get.hwse3.coxph(
 	run_model = T,
-	additional.lag = additional.lag[2],
-	employment_status.lag = employment_status.lag[2])
+	additional.lag = additional.lag[j],
+	employment_status.lag = employment_status.lag[j],
+	year.max = 1994)
 get.coef(time_scale = "age", hwse3 = T,
-				 additional.lag = additional.lag[2],
-				 employment_status.lag = employment_status.lag[2])
+				 additional.lag = additional.lag[j],
+				 employment_status.lag = employment_status.lag[j],
+				 year.max = 1994)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -96,7 +101,7 @@ get.coef(time_scale = "age", hwse3 = T,
 # 				 directory = here::here(paste0("./reports/resources/Lag ", exposure.lag)))
 
 # HWSE 2 HRs ####
-for (j in 1:2) {
+for (j in 1:length(employment_status.lag)) {
 	og_hwse.ggtab <- rbindlist(get.hwse.ggtab(
 		outcomes = outcomes.which,
 		# # Change messy_sol for clean soluble referent group

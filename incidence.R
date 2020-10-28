@@ -882,6 +882,7 @@ get.hwse2.coxph <- function(
 	time_scale = "age",
 	additional.lag = 0,
 	employment_status.lag = 0,
+	year.max = Inf,
 	directory.name = NULL) {
 
 	options(warn = 2)
@@ -1107,6 +1108,11 @@ get.hwse2.coxph <- function(
 			dat <- get(paste0(code, ".dat2"))
 		}
 
+		# Apply year.max
+		if (is.finite(year.max)) {
+			dat <- dat[year <= year.max]
+		}
+		
 		# dat <- dat[studyno %in% sample(unique(studyno), 8000)]
 		# Save data ####
 		if (save_dat) {
@@ -1165,6 +1171,7 @@ get.hwse2.coxph <- function(
 			if (is.null(directory.name)) {
 				directory.name <- to_drive_D(gsub("//", "/", here::here(
 					paste('./resources/hwse 2',
+								ifelse(is.finite(year.max), paste0("FU through ", year.max), ""),
 								paste0("lag ", 1 + additional.lag),
 								ifelse(employment_status.lag != 0,
 											 paste0("Employment status lagged ", employment_status.lag, " years"),
@@ -1284,7 +1291,8 @@ get.hwse3.coxph <- function(
 	time_scale = "age",
 	additional.lag = 21,
 	employment_status.lag = 21,
-	directory.name = NULL) {
+	directory.name = NULL,
+	year.max = Inf) {
 
 	options(warn = 2)
 
@@ -1370,6 +1378,12 @@ get.hwse3.coxph <- function(
 	}
 
 	# dat <- dat[studyno %in% sample(unique(studyno), 8000)]
+	
+	# Apply year.max
+	if (is.finite(year.max)) {
+		dat <- dat[year <= year.max]
+	}
+	
 	# Save data ####
 	if (save_dat) {
 		assign("dat3",
@@ -1415,6 +1429,7 @@ get.hwse3.coxph <- function(
 		if (is.null(directory.name)) {
 			directory.name <- to_drive_D(here::here(paste0(
 				'./resources/hwse 3',
+				ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
 				"/Lag ", 1 + additional.lag,
 				ifelse(employment_status.lag != 0,
 							 paste0("/Employment status lagged ", employment_status.lag, " years"),
@@ -1477,7 +1492,8 @@ get.coef <- function(
 	mod.name = NULL,
 	mod.directory = NULL,
 	directory = NULL,
-	file.prefix = NULL
+	file.prefix = NULL,
+	year.max = Inf
 ) {
 
 	if (hwse3) {
@@ -1549,6 +1565,7 @@ get.coef <- function(
 								 paste0("lag ", exposure.lag + additional.lag),
 								 paste0(
 								 	ifelse(hwse2, "hwse 2", "hwse 3"),
+								 	ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
 								 	"/Lag ", 1 + additional.lag,
 								 	ifelse(employment_status.lag != 0,
 								 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
