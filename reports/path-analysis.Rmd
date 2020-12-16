@@ -25,6 +25,7 @@ csl: "`r path.expand('~/HeadRs/csl/ama.csl')`"
 geometry: margin=2.54cm
 ---
 
+
 \onehalfspacing
 <!-- \renewcommand{\arraystretch}{1.1} -->
 \fancyhead[R]{}
@@ -102,15 +103,16 @@ In occupational cohort studies investigating occupational exposure, the first co
 
 ```{r, echo=F}
 exposure.lag <- 21
-employment_status.lag <- c(0, 21)
-hwse3.additional.lag <- 21
-hwse2.additional.lag <- c(0, 21)
+employment_status.lag <- 0 #c(0, 21)
+hwse3.additional.lag <- 0 # 21
+hwse2.additional.lag <- 0 #c(0, 21)
 spline_yin <- T
 spline_year <- T
 time_scale <- "age"
 hwse2.time_scale <- "age"
 table.engine <- "xtable"
 messy_sol <- 0.05
+year.max <- 1994
 
 ```
 
@@ -133,7 +135,7 @@ library(tikzDevice)
 source("~/HeadRs/00-my-theme.R")
 incidence.key <- fread(here::here("resources", 'cancer-key-expanded.tsv'))
 nevent <- readRDS(here::here("resources", "nevent.rds"))
-cancers.which <- grep("stomach|bladder|hodgkin", incidence.key$description, ignore.case = T)
+cancers.which <- grep("stomach|lung|rectal|colon|breast|hodgkin", incidence.key$description, ignore.case = T)
 
 ```
 
@@ -285,10 +287,12 @@ clean.coef.tab <- function(x,
 
 
 ```{r hwse2}
-for (j in 1:2) {
+for (j in 1:length(hwse2.additional.lag)) {
 hwse2.directory <- gsub("//", "/", here::here(paste(
 	"./reports/resources/",
-	paste0("hwse 2/Lag ", 1 + hwse2.additional.lag[j],
+	paste0("hwse 2",
+								ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
+								"/Lag ", 1 + hwse2.additional.lag[j],
 				 ifelse(employment_status.lag[j] != 0,
 				 			 paste0("/Employment status lagged ", employment_status.lag[j], " years"), "")),
 	ifelse(grepl("age", hwse2.time_scale), "indexed by age", "indexed by calendar"),
@@ -413,9 +417,10 @@ if (table.engine == "xtable") {
 ```{r hwse3}
 directory <- gsub("//", "/", here::here(paste(
 	"./reports/resources/hwse 3",
+	ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
 	paste0("Lag ", 1 + hwse3.additional.lag),
-	ifelse(employment_status.lag[2] == 0, "",
-								paste0("employment status lagged ", employment_status.lag[2], " years")),
+	ifelse(employment_status.lag[length(hwse2.additional.lag)] == 0, "",
+								paste0("employment status lagged ", employment_status.lag[length(hwse2.additional.lag)], " years")),
 	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
 	sep = "/"
 )))
@@ -445,8 +450,8 @@ coef.tab <- readRDS(
 			coef.tab[,-'events'] %>% xtable(
 				align = c("c", "l", "l", rep("r", ncol(.) - 3), "c"),
 				caption = paste0("Adjusted HR estimates for \\textbf{leaving work}. ",
-																					ifelse(employment_status.lag[2] == 0, "",
-																												paste0("Leaving work was lagged ", employment_status.lag[2], " years.")))
+																					ifelse(employment_status.lag[length(hwse2.additional.lag)] == 0, "",
+																												paste0("Leaving work was lagged ", employment_status.lag[length(hwse2.additional.lag)], " years.")))
 			) %>% print.xtable(
 				tabular.environment = "longtable")
 		}
