@@ -40,7 +40,7 @@ get.coxph <- function(
 
 	options(warn = 2)
 
-	invisible(sapply(outcomes, function(i = outcomes.which[32]) {
+	invisible(sapply(outcomes, function(i = outcomes[1]) {
 		# Get data ####
 
 		# Two-to-three letter code indicating cancer type
@@ -63,6 +63,81 @@ get.coxph <- function(
 			}}
 
 		dat <- as.data.table(as.data.frame(get(cohort_name)))
+
+		# Additional lag ####
+		setorder(dat, studyno, year)
+		dat[,`:=`(I = 1:.N,
+							N = .N), by = .(studyno)]
+		if (additional.lag > 0) {
+			dat[,`:=`(
+				straight = shift(straight, additional.lag, fill = 0),
+				cum_straight = shift(cum_straight, additional.lag, fill = 0),
+				soluble = shift(soluble, additional.lag, fill = 0),
+				cum_soluble = shift(cum_soluble, additional.lag, fill = 0),
+				synthetic = shift(synthetic, additional.lag, fill = 0),
+				cum_synthetic = shift(cum_synthetic, additional.lag, fill = 0)
+				# cum_bio = shift(cum_bio, additional.lag, fill = 0),
+				# cum_cl = shift(cum_cl, additional.lag, fill = 0),
+				# cum_ea = shift(cum_ea, additional.lag, fill = 0),
+				# cum_tea = shift(cum_tea, additional.lag, fill = 0),
+				# cum_trz = shift(cum_trz, additional.lag, fill = 0),
+				# cum_s = shift(cum_s, additional.lag, fill = 0),
+				# cum_no2 = shift(cum_no2, additional.lag, fill = 0),
+				# bio = shift(bio, additional.lag, fill = 0),
+				# cl = shift(cl, additional.lag, fill = 0),
+				# ea = shift(ea, additional.lag, fill = 0),
+				# tea = shift(tea, additional.lag, fill = 0),
+				# trz = shift(trz, additional.lag, fill = 0),
+				# s = shift(s, additional.lag, fill = 0),
+				# no2 = shift(no2, additional.lag, fill = 0)
+			), by = .(studyno)]
+		}
+		if (additional.lag < 0) {
+			dat[,`:=`(
+				straight = shift(straight, additional.lag, fill = straight[I == N]),
+				soluble = shift(soluble, additional.lag, fill = soluble[I == N]),
+				synthetic = shift(synthetic, additional.lag, fill = synthetic[I == N])
+				# bio = shift(bio, additional.lag, fill = bio[I == N]),
+				# cl = shift(cl, additional.lag, fill = cl[I == N]),
+				# ea = shift(ea, additional.lag, fill = ea[I == N]),
+				# tea = shift(tea, additional.lag, fill = tea[I == N]),
+				# trz = shift(trz, additional.lag, fill = trz[I == N]),
+				# s = shift(s, additional.lag, fill = s[I == N]),
+				# no2 = shift(no2, additional.lag, fill = no2[I == N])
+			), by = .(studyno)]
+			# Exposure after leaving work is 0
+			dat[year > (year(jobloss.date) + exposure.lag + additional.lag), `:=`(
+				straight = 0,
+				soluble = 0,
+				synthetic = 0
+				# bio = 0,
+				# cl = 0,
+				# ea = 0,
+				# tea = 0,
+				# trz = 0,
+				# s = 0,
+				# no2 = 0
+			)]
+			dat[,`:=`(
+				cum_straight = cumsum(straight),
+				cum_soluble = cumsum(soluble),
+				cum_synthetic = cumsum(synthetic)
+				# cum_bio = cumsum(bio),
+				# cum_cl = cumsum(cl),
+				# cum_ea = cumsum(ea),
+				# cum_tea = cumsum(tea),
+				# cum_trz = cumsum(trz),
+				# cum_s = cumsum(s),
+				# cum_no2 = cumsum(no2),
+			), by = .(studyno)]
+		}
+
+		# # New category: Alkanolamines
+		# dat[,`:=`(
+		# 	ohnh = ea + tea,
+		# 	cum_ohnh = cum_ea + cum_tea
+		# )]
+
 
 		# When to start FU ####
 		# HWSE 3 is for the MWF-leaving work association: no bounds to FU
@@ -197,107 +272,33 @@ get.coxph <- function(
 			),
 			yin), 'year'))]
 
-		# Additional lag ####
-		setorder(dat, studyno, year)
-		dat[,`:=`(I = 1:.N,
-							N = .N), by = .(studyno)]
-		if (additional.lag > 0) {
-			dat[,`:=`(
-				straight = shift(straight, additional.lag, fill = 0),
-				cum_straight = shift(cum_straight, additional.lag, fill = 0),
-				soluble = shift(soluble, additional.lag, fill = 0),
-				cum_soluble = shift(cum_soluble, additional.lag, fill = 0),
-				synthetic = shift(synthetic, additional.lag, fill = 0),
-				cum_synthetic = shift(cum_synthetic, additional.lag, fill = 0)
-				# cum_bio = shift(cum_bio, additional.lag, fill = 0),
-				# cum_cl = shift(cum_cl, additional.lag, fill = 0),
-				# cum_ea = shift(cum_ea, additional.lag, fill = 0),
-				# cum_tea = shift(cum_tea, additional.lag, fill = 0),
-				# cum_trz = shift(cum_trz, additional.lag, fill = 0),
-				# cum_s = shift(cum_s, additional.lag, fill = 0),
-				# cum_no2 = shift(cum_no2, additional.lag, fill = 0),
-				# bio = shift(bio, additional.lag, fill = 0),
-				# cl = shift(cl, additional.lag, fill = 0),
-				# ea = shift(ea, additional.lag, fill = 0),
-				# tea = shift(tea, additional.lag, fill = 0),
-				# trz = shift(trz, additional.lag, fill = 0),
-				# s = shift(s, additional.lag, fill = 0),
-				# no2 = shift(no2, additional.lag, fill = 0)
-			), by = .(studyno)]
-		}
-		if (additional.lag < 0) {
-			dat[,`:=`(
-				straight = shift(straight, additional.lag, fill = straight[I == N]),
-				soluble = shift(soluble, additional.lag, fill = soluble[I == N]),
-				synthetic = shift(synthetic, additional.lag, fill = synthetic[I == N])
-				# bio = shift(bio, additional.lag, fill = bio[I == N]),
-				# cl = shift(cl, additional.lag, fill = cl[I == N]),
-				# ea = shift(ea, additional.lag, fill = ea[I == N]),
-				# tea = shift(tea, additional.lag, fill = tea[I == N]),
-				# trz = shift(trz, additional.lag, fill = trz[I == N]),
-				# s = shift(s, additional.lag, fill = s[I == N]),
-				# no2 = shift(no2, additional.lag, fill = no2[I == N])
-			), by = .(studyno)]
-			# Exposure after leaving work is 0
-			dat[year > (year(jobloss.date) + exposure.lag + additional.lag), `:=`(
-				straight = 0,
-				soluble = 0,
-				synthetic = 0
-				# bio = 0,
-				# cl = 0,
-				# ea = 0,
-				# tea = 0,
-				# trz = 0,
-				# s = 0,
-				# no2 = 0
-			)]
-			dat[,`:=`(
-				cum_straight = cumsum(straight),
-				cum_soluble = cumsum(soluble),
-				cum_synthetic = cumsum(synthetic)
-				# cum_bio = cumsum(bio),
-				# cum_cl = cumsum(cl),
-				# cum_ea = cumsum(ea),
-				# cum_tea = cumsum(tea),
-				# cum_trz = cumsum(trz),
-				# cum_s = cumsum(s),
-				# cum_no2 = cumsum(no2),
-			), by = .(studyno)]
-		}
-
-		# New category: Alkanolamines
-		dat[,`:=`(
-			ohnh = ea + tea,
-			cum_ohnh = cum_ea + cum_tea
-		)]
-
 		# Age at leaving work (before employment status lag)
 		dat[,`:=`(
 			age.leavework = time_length(difftime(jobloss.date, yob), 'year')
 		)]
 
-		# # Define quantiles ####
-		# covariate.breaks <- apply(dat[status == 1, .(
-		# 	year,
-		# 	yin = yin.gm,
-		# 	employment.years,
-		# 	age = age.year2 / 365)], 2, function(x) {
-		# 		if (length(x) > 100) {
-		# 			breaks <- quantile(x, seq(0, 1, 1 / 5))
-		# 		} else if (length(x) > 80) {
-		# 			breaks <- quantile(x, seq(0, 1, 1 / 4))
-		# 		} else if (length(x) > 60) {
-		# 			breaks <- quantile(x, seq(0, 1, 1 / 3))
-		# 		} else {
-		# 			breaks <- quantile(x, seq(0, 1, 1 / 2))
-		# 		}
-		# 		breaks[-length(breaks)] <- floor(breaks[-length(breaks)])
-		# 		breaks[length(breaks)] <- ceiling(breaks[length(breaks)])
-		# 		breaks[c(1, length(breaks))] <- c(-Inf, Inf)
-		# 		breaks
-		# 	})
-		#
-		# covariate.breaks <- as.data.table(covariate.breaks)
+		# Define quantiles ####
+		covariate.breaks <- apply(dat[status == 1, .(
+			year,
+			yin = yin.gm,
+			employment.years,
+			age = age.year2 / 365)], 2, function(x) {
+				if (length(x) > 100) {
+					breaks <- quantile(x, seq(0, 1, 1 / 5))
+				} else if (length(x) > 80) {
+					breaks <- quantile(x, seq(0, 1, 1 / 4))
+				} else if (length(x) > 60) {
+					breaks <- quantile(x, seq(0, 1, 1 / 3))
+				} else {
+					breaks <- quantile(x, seq(0, 1, 1 / 2))
+				}
+				breaks[-length(breaks)] <- floor(breaks[-length(breaks)])
+				breaks[length(breaks)] <- ceiling(breaks[length(breaks)])
+				breaks[c(1, length(breaks))] <- c(-Inf, Inf)
+				breaks
+			})
+
+		covariate.breaks <- as.data.table(covariate.breaks)
 
 		# # Pool last two calendar year levels
 		# covariate.breaks[is.finite(year), year := {
@@ -357,7 +358,8 @@ get.coxph <- function(
 				}
 				breaks
 			}),
-			apply(dat[status == 1, .(cum_soluble5 = cum_soluble)], 2, function(x) {
+			apply(dat[status == 1, .(cum_soluble5 = cum_soluble,
+															 soluble5 = soluble)], 2, function(x) {
 				x <- x[x > 0]
 				if (length(x) > 40) {
 					if (length(x) > 60) {
@@ -434,7 +436,7 @@ get.coxph <- function(
 			`Duration of employment` = get.cut(employment.years, covariate.breaks),
 			Age = get.cut(age.year2 / 365, covariate.breaks, "age"),
 			Straight = get.cut(straight, mwf.breaks, dig.lab = 3),
-			Soluble = get.cut(soluble, mwf.breaks, dig.lab = 3),
+			Soluble = get.cut(soluble, mwf.breaks, "soluble5", dig.lab = 3),
 			Synthetic =  get.cut(synthetic, mwf.breaks, dig.lab = 3),
 			`Time off` =  get.cut(off, mwf.breaks, dig.lab = 3),
 			`Cumulative straight` = get.cut(cum_straight, mwf.breaks, dig.lab = 3),

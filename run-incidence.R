@@ -33,7 +33,7 @@ get.coef(
 
 rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
 
- # HWSE 2 with Messy soluble ####
+# HWSE 2 with Messy soluble ####
 for (j in 1:length(employment_status.lag)) {
 get.hwse2.coxph(
 	# outcomes = grep("lung|rectal|colon|breast|all", incidence.key$description, ignore.case = T),
@@ -59,7 +59,7 @@ sapply(c("Binary", paste("Age", seq(50, 60, 5))),
 			 	year.max = 1994)})
 }
 
-# #  HWSE 3 with Messy soluble ####
+#  HWSE 3 with Messy soluble ####
 get.hwse3.coxph(
 	run_model = T,
 	additional.lag = additional.lag[j],

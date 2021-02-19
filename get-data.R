@@ -88,6 +88,13 @@ if (!('cohort_analytic' %in% ls())) {
 		cum_no2 = cumsum(no2)
 	), by = .(studyno)]
 
+	# Time off
+	cohort_analytic[,`:=`(
+		off = off.gan + off.san + off.han
+	)]
+	cohort_analytic[is.na(off), off := 0]
+	cohort_analytic[, cum_off := cumsum(off), by = .(studyno)]
+
 	# Which columns ####
 	col.names <- names(cohort_analytic[, c(
 		"studyno",
@@ -114,6 +121,7 @@ if (!('cohort_analytic' %in% ls())) {
 		"dateout.date",
 		"employment_end.date",
 		"employment_end.date.legacy",
+		"off", "cum_off",
 		"yout",
 		"yout_recode",
 		"jobloss.date",
