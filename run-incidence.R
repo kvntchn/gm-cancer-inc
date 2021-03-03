@@ -15,35 +15,101 @@ source(here::here("get-data.R"))
 source(here::here("incidence.R"))
 employment_status.lag <- c(0)
 additional.lag <- c(0)
-outcomes.which <- grep("male|stomach|hodgkin|lung|rectal|colon|breas|prostat|colorec", incidence.key$description, ignore.case = T)
+outcomes.which1 <- grep("male|stomach|hodgkin|lung|rectal|colon|breas|prostat|colorec", incidence.key$description, ignore.case = T)
+outcomes.which <- grep("colon|rectal|pancreatic|esophageal|stomach|laryn|lung|breast|prostate|kidney|bladder|melanom|^leuk|hodgkin|all cancers", incidence.key$description, ignore.case = T)
+outcomes.which <- outcomes.which[!outcomes.which %in% outcomes.which1[-(10:11)]]
 
 incidence.key[outcomes.which,]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# # Get imputed race ####
+# gm_dta <- cohort_analytic[
+# 	nohist == 0 & wh == 1 & immortal == 0 &
+# 		right.censored != 1 & year >= 1941 & (
+# 			year(yin) < 1938 | year >= year(yin + 365.25 * 3))]
+#
+# gm_dta[,yin.date := gm.to.date(yin.gm)]
+#
+# gm_dta[,`:=`(employment.years = time_length(difftime(year2, yin.date), 'years')), by = .(studyno)]
+#
+# gm_dta[, `:=`(
+# 	`Cumulative_time_off` = cut(cum_off, c(-Inf, 0, quantile(cum_off[cum_off > 0], seq(0.2, 1, 0.2)))),
+# 	`Duration_of_employment` = cut(employment.years, c(-Inf, quantile(employment.years, seq(0.2, 1, 0.2)))),
+# 	canc_corec = factor(canc_corec),
+# 	canc_co = factor(canc_co),
+# 	canc_re = factor(canc_re),
+# 	canc_st = factor(canc_st),
+# 	canc_lu = factor(canc_lu),
+# 	canc_br = factor(canc_br),
+# 	canc_fe = factor(canc_fe),
+# 	canc_ma = factor(canc_ma),
+# 	canc_pr = factor(canc_pr),
+# 	canc_nhl = factor(canc_nhl),
+# 	Age = cut(age.year2/365, quantile(age.year2/365, seq(0, 1, 1/6)), include.lowest = T),
+# 	Year = cut(year,
+# 						 unique(quantile(year, seq(0, 1, 1/6))),
+# 						 include.lowest = T, dig.lab = 4),
+# 	yin = cut(yin.gm,
+# 						unique(quantile(yin.gm, seq(0, 1, 1/6))),
+# 						include.lowest = T),
+# 	Straight = cut(cum_straight,
+# 								 c(-Inf, 0, quantile(cum_straight[cum_straight > 0], seq(1/3, 1, 1/3))),
+# 								 include.lowest = T),
+# 	Soluble5 = cut(cum_soluble,
+# 								 c(-Inf, 0.05, quantile(cum_soluble[cum_soluble > 0.05], seq(1/3, 1, 1/3))),
+# 								 include.lowest = T),
+# 	Synthetic = cut(cum_synthetic,
+# 									unique(c(-Inf, 0, quantile(cum_synthetic[cum_synthetic > 0], seq(1/3, 1, 1/3)))),
+# 									include.lowest = T),
+# 	Sex = sex,
+# 	Plant = plant,
+# 	All_causes = `All causes`,
+# 	Race = factor(
+# 		finrace,
+# 		levels = c(1, 2, 0, 9),
+# 		labels = c("White", "Black", NA, NA)),
+# 	# An indicator of having observed race
+# 	R = ifelse(finrace %in% c(0, 9), 0, 1)
+# )]
+#
+# source(here::here("../gm-race-imputation/imputation.R"))
+# race.imputed.melt <- get.race_posterior(
+# 	gm_dta,
+# 	dir.id = 132157022198,
+# 	file.name = "race.mcmc.rds"
+# )
+# box_write(race.imputed.melt,
+# 					file_name = "race.imputed.melt.rds",
+# 					dir_id = 132157022198,
+# 					description = "Predictive distribution for race.")
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # Run model ####
 # MWF-Cancer with Messy soluble ####
 get.coxph(
-	# outcomes = c(25, 31),
+	outcomes = outcomes.which,
 	run_model = T,
-	time_scale = "age")
+	time_scale = "age",
+	mi = 15)
 get.coef(
-	# outcomes = c(25, 31),
+	outcomes = outcomes.which,
 	# new_dat = F,
-	time_scale = "age")
+	time_scale = "age",
+	mi = 50)
 
 rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
 
 # HWSE 2 with Messy soluble ####
-for (j in 1:length(employment_status.lag)) {
 get.hwse2.coxph(
-	# outcomes = grep("lung|rectal|colon|breast|all", incidence.key$description, ignore.case = T),
+	outcomes = outcomes.which,
 	run_model = T,
 	spline_year = T,
 	spline_yin = T,
 	time_scale = "age",
-	additional.lag = additional.lag[j],
-	employment_status.lag = employment_status.lag[j],
-	year.max = 1994
+	additional.lag = additional.lag,
+	employment_status.lag = employment_status.lag,
+	year.max = 1994,
+	mi = 50
 )
 sapply(c("Binary", paste("Age", seq(50, 60, 5))),
 			 function(x = "Age 55") {get.coef(
@@ -54,21 +120,24 @@ sapply(c("Binary", paste("Age", seq(50, 60, 5))),
 			 	spline_year = T,
 			 	spline_yin = T,
 			 	hwse2 = T,
-			 	additional.lag = additional.lag[j],
-			 	employment_status.lag = employment_status.lag[j],
-			 	year.max = 1994)})
-}
+			 	additional.lag = additional.lag,
+			 	employment_status.lag = employment_status.lag,
+			 	year.max = 1994,
+			 	mi = 50)})
 
-#  HWSE 3 with Messy soluble ####
-get.hwse3.coxph(
-	run_model = T,
-	additional.lag = additional.lag[j],
-	employment_status.lag = employment_status.lag[j],
-	year.max = 1994)
-get.coef(time_scale = "age", hwse3 = T,
-				 additional.lag = additional.lag[j],
-				 employment_status.lag = employment_status.lag[j],
-				 year.max = 1994)
+# #  HWSE 3 with Messy soluble ####
+# get.hwse3.coxph(
+# 	run_model = T,
+# 	additional.lag = additional.lag,
+# 	employment_status.lag = employment_status.lag,
+# 	year.max = 1994,
+# 	mi = 50)
+# get.coef(hwse3 = T,
+# 				 additional.lag = additional.lag,
+# 				 employment_status.lag = employment_status.lag,
+# 				 year.max = 1994,
+# 				 new_dat = F,
+# 				 mi = 50)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

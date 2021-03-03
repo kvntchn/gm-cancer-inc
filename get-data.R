@@ -261,7 +261,7 @@ incidence.key <- rbindlist(
 			 		"yod", "yod")
 			 )))
 
-# fwrite(incidence.key, here::here("resources", 'cancer-key-expanded.tsv'))
+# fwrite(incidence.key, here::here("resources", 'cancer-key-expanded.csv'))
 
 # Cases per outcome ####
 get.nevent <- function(outcomes = 1:nrow(incidence.key),

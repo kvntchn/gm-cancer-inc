@@ -26,7 +26,7 @@ cohort_analytic <- get.cohort_analytic(
 	outcome_type = "incidence",
 	exposure.lag = 21,
 	deathage.max = NULL,
-	end.year = 2015,
+	year.max = 2015,
 	hire.year.min = -Inf,
 	use_seer = T
 )
