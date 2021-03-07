@@ -20,7 +20,7 @@ output:
   #   # latex_engine: lualatex
   #   includes:
   #     in_header: "~/HeadRs/BeamerHead.sty"
-bibliography: "`r path.expand('~/eisen/gm/references/gm.bib')`"
+bibliography: "`r path.expand('~/Box Sync/papers/EnvEpi.bib')`"
 csl: "`r path.expand('~/HeadRs/csl/ama.csl')`"
 geometry: margin=2.54cm
 ---
@@ -59,6 +59,8 @@ knitr::opts_chunk$set(echo = F,
 											fig.align = 'center',
 											fig.pos = 'H',
 											results = 'asis')
+
+setwd('~/eisen/gm-cancer-inc')
 
 library(here)
 library(pander)
@@ -304,7 +306,7 @@ rbindlist(
 				 paste0("_sol", messy_sol %/% .01), ""),
 						 		ifelse(spline_year,
 						 					 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-						 					 ifelse(spline_yin, paste0("_splinedyin"))),
+						 					 ifelse(spline_yin, paste0("_splinedyin"), "")),
 							 			 ".tab.rds")), envir = .GlobalEnv)
 		}
 		))
@@ -387,8 +389,10 @@ if (table.engine == "xtable") {
 ```{r hwse3}
 directory <- gsub("//", "/", here::here(paste(
 	"./reports/resources/hwse 3",
-	paste0("Lag ", exposure.lag + hwse3.additional.lag),
+	"FU through 1994",
+	paste0("Lag ", 1 + hwse3.additional.lag),
 	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
+	"mi race",
 	sep = "/"
 )))
 
@@ -399,10 +403,10 @@ coef.tab <- readRDS(
 						 paste0("_sol", messy_sol %/% .01), ""),
 			ifelse(spline_year,
 						 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-						 ifelse(spline_yin, paste0("_splinedyin"), ""))
-		, ".tab.rds"))))
+						 ifelse(spline_yin, paste0("_splinedyin"), "")),
+			".M50.tab.rds"))))
 
-		coef.tab <- clean.coef.tab(coef.tab)
+		coef.tab <- clean.coef.tab(coef.tab[,c(1:6, 8)])
 		
 		# Clean up covariate name
 		coef.tab[Covariate == "Cumulative soluble 5",
@@ -425,10 +429,14 @@ coef.tab <- readRDS(
 ```
 
 ```{r coxph}
+spline_yin <- F
+spline_year <- F
+
 directory <- gsub("//", "/", here::here(paste(
 	"./reports/resources/",
 	paste0("Lag ", exposure.lag),
 	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
+	"mi race",
 	sep = "/"
 )))
 
@@ -455,9 +463,9 @@ invisible(
 							 ifelse(spline_year,
 							 			 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
 							 			 ifelse(spline_yin, paste0("_splinedyin"), "")),
-							 ".tab.rds"))
+							 ".M50.tab.rds"))
 		# HWSE 2 model
-		tab.names <- c("hwse2.coef.tab",
+		tab.names <- c("hwse2..coef.tab",
 									 "hwse2_50.coef.tab",
 									 "hwse2_55.coef.tab",
 									 "hwse2_60.coef.tab"
@@ -481,7 +489,7 @@ invisible(
 		# ))
 		
 		coef.tab <- rbindlist(list(
-			clean.coef.tab(coef.tab)
+			clean.coef.tab(coef.tab[,c(1:6, 8)])
 			# clean.coef.tab(hwse2.coef.tab[1:2,]),
 			# clean.coef.tab(hwse2_50.coef.tab[1:3,]),
 			# clean.coef.tab(hwse2_55.coef.tab[1:3,]),

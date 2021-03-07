@@ -3,6 +3,7 @@
 # July 15, 2020
 
 library(here)
+set.seed(03032021)
 
 # rm(list = ls())
 # rm(list = ls()[-grep("outcome.selected", ls())])
@@ -15,9 +16,7 @@ source(here::here("get-data.R"))
 source(here::here("incidence.R"))
 employment_status.lag <- c(0)
 additional.lag <- c(0)
-outcomes.which1 <- grep("male|stomach|hodgkin|lung|rectal|colon|breas|prostat|colorec", incidence.key$description, ignore.case = T)
 outcomes.which <- grep("colon|rectal|pancreatic|esophageal|stomach|laryn|lung|breast|prostate|kidney|bladder|melanom|^leuk|hodgkin|all cancers", incidence.key$description, ignore.case = T)
-outcomes.which <- outcomes.which[!outcomes.which %in% outcomes.which1[-(10:11)]]
 
 incidence.key[outcomes.which,]
 
@@ -78,66 +77,80 @@ incidence.key[outcomes.which,]
 # 	dir.id = 132157022198,
 # 	file.name = "race.mcmc.rds"
 # )
-# box_write(race.imputed.melt,
-# 					file_name = "race.imputed.melt.rds",
+# box_save(race.imputed.melt,
+# 					file_name = "race.imputed.melt.rdata",
 # 					dir_id = 132157022198,
 # 					description = "Predictive distribution for race.")
+# name        : race.imputed.melt.rdata
+# file id     : 783387319906
+# version     : V1
+# size        : 2 GB
+# modified at : 2021-03-04 23:02:10
+# created at  : 2021-03-04 23:02:10
+# uploaded by : kevchen@berkeley.edu
+# owned by    : spa-ehsadmin@berkeley.edu
+# shared link : None
+#
+# parent folder name :  MI Race
+# parent folder id   :  132157022198
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Run model ####
-# MWF-Cancer with Messy soluble ####
-get.coxph(
-	outcomes = outcomes.which,
-	run_model = T,
-	time_scale = "age",
-	mi = 15)
-get.coef(
-	outcomes = outcomes.which,
-	# new_dat = F,
-	time_scale = "age",
-	mi = 50)
-
-rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
-
-# HWSE 2 with Messy soluble ####
-get.hwse2.coxph(
-	outcomes = outcomes.which,
-	run_model = T,
-	spline_year = T,
-	spline_yin = T,
-	time_scale = "age",
-	additional.lag = additional.lag,
-	employment_status.lag = employment_status.lag,
-	year.max = 1994,
-	mi = 50
-)
-sapply(c("Binary", paste("Age", seq(50, 60, 5))),
-			 function(x = "Age 55") {get.coef(
-			 	outcomes = outcomes.which,
-			 	new_dat = F,
-			 	time_scale = "age",
-			 	employment.which = x,
-			 	spline_year = T,
-			 	spline_yin = T,
-			 	hwse2 = T,
-			 	additional.lag = additional.lag,
-			 	employment_status.lag = employment_status.lag,
-			 	year.max = 1994,
-			 	mi = 50)})
-
-# #  HWSE 3 with Messy soluble ####
-# get.hwse3.coxph(
+# # Run model ####
+# # MWF-Cancer with Messy soluble ####
+# get.coxph(
+# 	outcomes = outcomes.which,
 # 	run_model = T,
+# 	time_scale = "age",
+# 	mi = 50)
+# get.coef(
+# 	outcomes = outcomes.which,
+# 	# new_dat = F,
+# 	time_scale = "age",
+# 	mi = 50)
+#
+# rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
+#
+# # HWSE 2 with Messy soluble ####
+# get.hwse2.coxph(
+# 	outcomes = outcomes.which,
+# 	run_model = T,
+# 	spline_year = F,
+# 	spline_yin = F,
+# 	time_scale = "age",
 # 	additional.lag = additional.lag,
 # 	employment_status.lag = employment_status.lag,
 # 	year.max = 1994,
-# 	mi = 50)
-# get.coef(hwse3 = T,
-# 				 additional.lag = additional.lag,
-# 				 employment_status.lag = employment_status.lag,
-# 				 year.max = 1994,
-# 				 new_dat = F,
-# 				 mi = 50)
+# 	# start_m = 31,
+# 	mi = 50
+# )
+# for (x in c("Binary", paste("Age", seq(50, 60, 5)))) {
+# 			 	get.coef(
+# 			 		outcomes = outcomes.which,
+# 			 		new_dat = T,
+# 			 		time_scale = "age",
+# 			 		employment.which = x,
+# 			 		spline_year = F,
+# 			 		spline_yin = F,
+# 			 		hwse2 = T,
+# 			 		additional.lag = additional.lag,
+# 			 		employment_status.lag = employment_status.lag,
+# 			 		year.max = 1994,
+# 			 		mi = 50)
+# 			 }
+
+#  HWSE 3 with Messy soluble ####
+get.hwse3.coxph(
+	run_model = F,
+	additional.lag = additional.lag,
+	employment_status.lag = employment_status.lag,
+	year.max = 1994,
+	mi = 50)
+get.coef(hwse3 = T,
+				 additional.lag = additional.lag,
+				 employment_status.lag = employment_status.lag,
+				 year.max = 1994,
+				 new_dat = F,
+				 mi = 50)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

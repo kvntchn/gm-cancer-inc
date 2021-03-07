@@ -29,6 +29,13 @@ if (!('cohort' %in% ls(envir = .GlobalEnv))) {
 	source(here::here('../gm-wrangling/wrangling', '00-hello.R'))
 }
 
+# Getting posterior distribution for imputation ####
+if (!"race.imputed.melt" %in% ls()) {
+message("Loading posterior distribution for imputation...")
+	# race.imputed.melt <- box_read(ifelse(exposure.lag == 21, 780327112319, NaN))
+	box_load(ifelse(exposure.lag == 21, 783387319906, NaN))
+}
+
 # Get cohort analytic ####
 if (!('cohort_analytic' %in% ls())) {
 	outcome.type <- 'incidence'

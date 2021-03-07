@@ -21,10 +21,10 @@ if (!("get.cohort2" %in% ls())) {
 	# rm(cohort_analytic)
 }
 
-# Posterior probabilities for mi race ####
-if (!"race.imputed.melt" %in% ls()) {
-	race.imputed.melt <- box_read(ifelse(exposure.lag == 21, 780327112319, NaN))
-}
+# # Posterior probabilities for mi race ####
+# if (!"race.imputed.melt" %in% ls()) {
+# 	race.imputed.melt <- box_read(ifelse(exposure.lag == 21, 780327112319, NaN))
+# }
 
 get.mi_race <- function(dat, M, posterior_probs, threshold = 0.5) {
 	lapply(1:M, function(m) {
@@ -50,8 +50,8 @@ get.coxph <- function(
 	run_model = F,
 	save_dat = T,
 	messy_sol = 0.05,
-	spline_year = T,
-	spline_yin = T,
+	spline_year = F,
+	spline_yin = F,
 	time_scale = "age",
 	hwse2 = F,
 	hwse3 = F,
@@ -60,12 +60,16 @@ get.coxph <- function(
 	directory.name = NULL,
 	employment_status.lag = 0,
 	year.max = 2015,
+	start_m = 1,
 	mi = 0) {
+
+	# start time
+	start <- Sys.time()
 
 	options(warn = 2)
 
 	# invisible(sapply(outcomes, function(i = outcomes[1]) # sapply over outcomes
-		for (i in outcomes) {
+	for (i in outcomes) {
 		# Get data ####
 
 		# Two-to-three letter code indicating cancer type
@@ -169,8 +173,8 @@ get.coxph <- function(
 		# If looking at mortality outcome, no need to start FU later
 		if (is.null(start.year)) {
 			if (F # No more FU starting in 1941
-				# hwse3 | i %in% which(grepl("copd|external", incidence.key$code))
-				) {
+					# hwse3 | i %in% which(grepl("copd|external", incidence.key$code))
+			) {
 				dat$start.year <- 1941} else if (
 					# If looking at cancer incidence, should use 1973 or 1985
 					min(dat$ddiag_first, na.rm = T) < as.Date("1985-01-01")) {
@@ -307,10 +311,12 @@ get.coxph <- function(
 			employment.years,
 			age = age.year2 / 365)], 2, function(x) {
 				if (length(x) > 100) {
-					breaks <- quantile(x, seq(0, 1, 1 / 5))
+					breaks <- quantile(x, seq(0, 1, 1 / 6))
 				} else if (length(x) > 80) {
-					breaks <- quantile(x, seq(0, 1, 1 / 4))
+					breaks <- quantile(x, seq(0, 1, 1 / 5))
 				} else if (length(x) > 60) {
+					breaks <- quantile(x, seq(0, 1, 1 / 4))
+				} else if (length(x) > 40) {
 					breaks <- quantile(x, seq(0, 1, 1 / 3))
 				} else {
 					breaks <- quantile(x, seq(0, 1, 1 / 2))
@@ -383,24 +389,24 @@ get.coxph <- function(
 			}),
 			apply(dat[status == 1, .(cum_soluble5 = cum_soluble,
 															 soluble5 = soluble)], 2, function(x) {
-				x <- x[x > 0]
-				if (length(x) > 40) {
-					if (length(x) > 60) {
-						probs <- seq(0, 1, 1 / 3)
-					} else {
-						probs <- seq(0, 1, 1 / 2)
-					}
-					breaks <- quantile(x[x > 0], probs)
-					breaks[c(1, length(probs))] <- c(0.05, Inf)
-					breaks <- c(-Inf, breaks)
-				} else {
-					breaks <- c(-Inf, 0.05, Inf)
-				}
-				if (length(breaks) < 5) {
-					breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-				}
-				breaks
-			}))
+															 	x <- x[x > 0]
+															 	if (length(x) > 40) {
+															 		if (length(x) > 60) {
+															 			probs <- seq(0, 1, 1 / 3)
+															 		} else {
+															 			probs <- seq(0, 1, 1 / 2)
+															 		}
+															 		breaks <- quantile(x[x > 0], probs)
+															 		breaks[c(1, length(probs))] <- c(0.05, Inf)
+															 		breaks <- c(-Inf, breaks)
+															 	} else {
+															 		breaks <- c(-Inf, 0.05, Inf)
+															 	}
+															 	if (length(breaks) < 5) {
+															 		breaks <- c(breaks, rep(NA, 5 - length(breaks)))
+															 	}
+															 	breaks
+															 }))
 
 		mwf.breaks <- as.data.table(mwf.breaks)
 
@@ -515,15 +521,20 @@ get.coxph <- function(
 
 		# Get data to impute
 		if (mi > 0) {
-			to_impute <- get.mi_race(dat, mi, race.imputed.melt)
-			assign(paste0(
-				gsub(" ", "_", code),
-				".mi_race.M", mi),
-			to_impute, inherits = T)
+			if (!paste0(gsub(" ", "_", code), ".mi_race.M", mi) %in% ls(envir = .GlobalEnv)) {
+				to_impute <- get.mi_race(dat, mi, race.imputed.melt)
+				assign(paste0(
+					gsub(" ", "_", code),
+					".mi_race.M", mi),
+					to_impute, inherits = T)
+			} else {
+				to_impute <- get(paste0(gsub(" ", "_", code),".mi_race.M", mi))
+			}
 		}
 
 		# Multiple imputation loop ####
-		lapply(if (mi == 0) {0} else {1:mi}, function(m = 1) {
+		# Loop over mi ####
+		lapply(if (mi == 0) {0} else {start_m:mi}, function(m = 1) {
 
 			if (mi > 0) {
 
@@ -545,89 +556,104 @@ get.coxph <- function(
 				table(dat[immortal != 1 & right.censored != 1]$Race, useNA = "always")
 			}
 
-		# Run model ####
-		if (run_model) {
-			dat <- dat[immortal != 1 & right.censored != 1]
-			Sys.sleep(0)
-			tmp.coxph <- coxph(as.formula(
-				paste(
-					ifelse(
-						grepl("age", time_scale),
-						"Surv(age.year1, age.year2, status) ~",
-						"Surv(year1, year2, status) ~"
-					),
-					"`Cumulative straight` +",
-					ifelse(
-						!is.finite(messy_sol),
-						"`Cumulative soluble` +",
-						paste0(
-							"`Cumulative soluble",
-							paste0(" ", messy_sol %/% 0.01),
-							"` +"
-						)
-					),
-					"`Cumulative synthetic` +",
-					ifelse(
-						grepl("age", time_scale),
-						ifelse(!spline_year, "Year +", "pspline(year, df = 0) +"),
-						"Age +"
-					),
-					ifelse(!spline_yin, "`Year of hire` + ", "pspline(yin.gm, df = 0) +"),
-					"Race + Plant",
-					ifelse(!grepl('breast|female|prostate', description, ignore.case = T), "+ Sex", "")
-				)
-			),
-			data = {
-				if (grepl('breast|female|prostate', description, ignore.case = T)) {
-					dat[Sex == ifelse(grepl('breast|female', description, ignore.case = T), "Female", "Male")]
-				} else {
-					dat
+			# Run model ####
+			if (run_model) {
+
+				dat <- dat[immortal != 1 & right.censored != 1]
+				Sys.sleep(0)
+				tmp.coxph <- coxph(as.formula(
+					paste(
+						ifelse(
+							grepl("age", time_scale),
+							"Surv(age.year1, age.year2, status) ~",
+							"Surv(year1, year2, status) ~"
+						),
+						"`Cumulative straight` +",
+						ifelse(
+							!is.finite(messy_sol),
+							"`Cumulative soluble` +",
+							paste0(
+								"`Cumulative soluble",
+								paste0(" ", messy_sol %/% 0.01),
+								"` +"
+							)
+						),
+						"`Cumulative synthetic` +",
+						ifelse(
+							grepl("age", time_scale),
+							ifelse(!spline_year, "Year +", "pspline(year, df = 0) +"),
+							"Age +"
+						),
+						ifelse(!spline_yin, "`Year of hire` + ", "pspline(yin.gm, df = 0) +"),
+						"Race + Plant",
+						ifelse(!grepl('breast|female|prostate', description, ignore.case = T), "+ Sex", "")
+					)
+				),
+				data = {
+					if (grepl('breast|female|prostate', description, ignore.case = T)) {
+						dat[Sex == ifelse(grepl('breast|female', description, ignore.case = T), "Female", "Male")]
+					} else {
+						dat
+					}
+				},
+				method = "efron")
+
+				# Save model  ####
+				if (is.null(directory.name)) {
+					directory.name <- to_drive_D(here::here(
+						paste0("resources/Lag ",
+									 exposure.lag + additional.lag,
+									 ifelse(!grepl("age", time_scale),
+									 			 "/indexed by calendar",
+									 			 "/indexed by age"),
+									 ifelse(mi > 0, "/mi race", ""),
+									 "/", code)
+					))
 				}
-			},
-			method = "efron")
 
-			# Save model  ####
-			if (is.null(directory.name)) {
-				directory.name <- to_drive_D(here::here(
-					paste0("resources/Lag ",
-								 exposure.lag + additional.lag,
-								 ifelse(!grepl("age", time_scale),
-								 			 "/indexed by calendar",
-								 			 "/indexed by age")),
-					ifelse(mi > 0, "mi race/", "")))
+				dir.create(directory.name, showWarnings = F, recursive = T)
+
+				final_name <- paste0(
+					directory.name, "/",
+					code,
+					ifelse(
+						is.finite(messy_sol),
+						paste0("_sol", messy_sol %/% .01),
+						""),
+					ifelse(spline_year,
+								 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+								 ifelse(spline_yin, paste0("_splinedyin"), "")),
+					ifelse(mi > 0, paste0(".m", m), ""),
+					".coxph.rds"
+				)
+
+				message(paste0("\nSaving model to:\n",
+											 final_name))
+				saveRDS(tmp.coxph,
+								file = final_name)
+
+				# if (nrow(dat[age.year2 <= age.year1]) > 0) {
+				# 	nrow(dat[age.year2 <= age.year1])
+				# }
+
+				# Print to console ####
+				cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
+				cat(unlist(description))
+				cat("\n")
+				if (mi > 0) {cat(paste0("m = ", m, "\n"))}
+				cat(paste0("Exposure lagged ", exposure.lag + additional.lag, " years\n"))
+				cat(paste0(tmp.coxph$nevent, " cases"))
+				# Time elapsed
+				since_start <- time_length(difftime(Sys.time(), start), "minutes")
+				if (since_start <= 90) {
+					cat(paste0("\n", round(since_start, 2), " minutes since get.coxph() was called."))
+				} else {
+					cat(paste0("\n", round(since_start/60, 3), " hours since get.coxph() was called."))
+				}
+				cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
+				print(summary(tmp.coxph)$coefficients)
+
 			}
-
-			dir.create(directory.name, showWarnings = F, recursive = T)
-
-			saveRDS(tmp.coxph,
-							file = paste0(
-								directory.name, "/",
-								code,
-								ifelse(
-									is.finite(messy_sol),
-									paste0("_sol", messy_sol %/% .01),
-									""),
-								ifelse(spline_year,
-											 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-											 ifelse(spline_yin, paste0("_splinedyin"), "")),
-								ifelse(mi > 0, paste0(".m", m), ""),
-								".coxph.rds"
-							))
-
-			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
-			# 	nrow(dat[age.year2 <= age.year1])
-			# }
-
-			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
-			print(unlist(description))
-			cat("\n")
-			if (mi > 0) {cat(paste0("m = ", m, "\n"))}
-			cat(paste0("Exposure lagged ", exposure.lag + additional.lag, " years\n"))
-			cat(paste0(tmp.coxph$nevent, " cases"))
-			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
-			print(tmp.coxph)
-			# foo
-		}
 		}) # End MI loop
 	}
 	# )) # end sapply over outcomes
@@ -680,28 +706,28 @@ get.hwse2.coxph <- function(
 	new_dat = T,
 	save_dat = T,
 	messy_sol = 0.05,
-	spline_year = T,
-	spline_yin = T,
+	spline_year = F,
+	spline_yin = F,
 	time_scale = "age",
 	additional.lag = 0,
 	employment_status.lag = 0,
 	year.max = Inf,
 	directory.name = NULL,
+	start_m = 1,
 	mi = 0) {
+
+	# start time
+	start <- Sys.time()
 
 	options(warn = 2)
 
-	invisible(sapply(outcomes, function(i = outcomes.which[1]) {
+	# invisible(sapply(outcomes, function(i = outcomes.which[1])
+	for (i in outcomes) {
 
 		code <- unlist(incidence.key[i, 1])
 		description <- unlist(incidence.key[i, 2])
 		var.name <- unlist(incidence.key[i, 3])
 
-		# Clean up working directory
-		rm(list = grep("*\\.dat$", ls(), value = T))
-		rm(list = grep("tmp.coxph", ls(), value = T))
-
-		# Get data ####
 		if (!(paste0(code, ".dat2") %in% ls()) | new_dat) {
 
 			get.coxph(
@@ -710,7 +736,8 @@ get.hwse2.coxph <- function(
 				outcomes = i,
 				hwse2 = T,
 				additional.lag = additional.lag,
-				employment_status.lag = employment_status.lag
+				employment_status.lag = employment_status.lag,
+				year.max = year.max
 			)
 
 			dat <- as.data.table(as.data.frame(get(paste0(code, ".dat2"), envir = .GlobalEnv)))
@@ -927,65 +954,59 @@ get.hwse2.coxph <- function(
 			Sys.sleep(0)
 		}
 
-		# dat <- dat[studyno %in% sample(
-		# 	unique(dat$studyno), 10000
-		# )]
+		basic_formula <- lapply(c(
+			"binary",
+			"age 50",
+			"age 55",
+			"age 60"), function(x = "age 50") {
+				paste(
+					ifelse(
+						grepl("age", time_scale),
+						"Surv(age.year1, age.year2, status) ~",
+						"Surv(year1, year2, status) ~"
+					),
+					paste0("`Employment status", gsub("[a-z]", "", x), "`"),
+					# "`Duration of employment` +",
+					"+ `Cumulative straight`",
+					ifelse(
+						!is.finite(messy_sol),
+						"+ `Cumulative soluble`",
+						paste0("+ `Cumulative soluble", paste0(" ", messy_sol %/% 0.01), "`")),
+					"+ `Cumulative synthetic`",
+					ifelse(
+						grepl("age", time_scale),
+						ifelse(!spline_year, "+ Year", "+ pspline(year, df = 0)"),
+						"+ Age"
+					),
+					ifelse(
+						!spline_yin,
+						"+ `Year of hire`",
+						"+ pspline(yin.gm, df = 0)"
+					),
+					if (length(table(dat$Race)) > 1) {"+ Race"},
+					if (length(table(dat$Plant)) > 1) {"+ Plant"},
+					ifelse(!grepl('breast|female|prosate', description, ignore.case = T), "+ Sex", "")
+				)
+			})
+		names(basic_formula) <- c("binary", paste0("age", seq(50, 60, 5)))
 
-		if (run_model) {
-			basic_formula <- lapply(c(
-				"binary",
-				"age 50",
-				"age 55",
-				"age 60"), function(x = "age 50") {
-					paste(
-						ifelse(
-							grepl("age", time_scale),
-							"Surv(age.year1, age.year2, status) ~",
-							"Surv(year1, year2, status) ~"
-						),
-						paste0("`Employment status", gsub("[a-z]", "", x), "`"),
-						# "`Duration of employment` +",
-						"+ `Cumulative straight`",
-						ifelse(
-							!is.finite(messy_sol),
-							"+ `Cumulative soluble`",
-							paste0("+ `Cumulative soluble", paste0(" ", messy_sol %/% 0.01), "`")),
-						"+ `Cumulative synthetic`",
-						ifelse(
-							grepl("age", time_scale),
-							ifelse(!spline_year, "+ Year", "+ pspline(year, df = 0)"),
-							"+ Age"
-						),
-						ifelse(
-							!spline_yin,
-							"+ `Year of hire`",
-							"+ pspline(yin.gm, df = 0)"
-						),
-						if (length(table(dat$Race)) > 1) {"+ Race"},
-						if (length(table(dat$Plant)) > 1) {"+ Plant"},
-						ifelse(!grepl('breast|female|prosate', description, ignore.case = T), "+ Sex", "")
-					)
-				})
-			names(basic_formula) <- c("binary", paste0("age", seq(50, 60, 5)))
+		dat <- dat[immortal != 1 & right.censored != 1]
+		Sys.sleep(0)
 
-			dat <- dat[immortal != 1 & right.censored != 1]
-			Sys.sleep(0)
-
-			# Directory names model  ####
-			if (is.null(directory.name)) {
-				directory.name <- to_drive_D(gsub("//", "/", here::here(
-					paste('./resources/hwse 2',
-								ifelse(is.finite(year.max), paste0("FU through ", year.max), ""),
-								paste0("lag ", 1 + additional.lag),
-								ifelse(employment_status.lag != 0,
-											 paste0("Employment status lagged ", employment_status.lag, " years"),
-											 ""
-								),
-								ifelse(!grepl("age", time_scale),
-											 "indexed by calendar",
-											 "indexed by age"
-								), sep = "/"))))
-			}
+		# Directory names model  ####
+		if (is.null(directory.name)) {
+			directory.name <- to_drive_D(gsub("//", "/", here::here(
+				paste('./resources/hwse 2',
+							ifelse(is.finite(year.max), paste0("FU through ", year.max), ""),
+							paste0("lag ", 1 + additional.lag),
+							ifelse(employment_status.lag != 0,
+										 paste0("Employment status lagged ", employment_status.lag, " years"),
+										 ""
+							),
+							ifelse(!grepl("age", time_scale),
+										 "indexed by calendar",
+										 "indexed by age"
+							), sep = "/"))))
 
 			if (length(directory.name) <= 1) {
 				directory.name <- paste(
@@ -994,22 +1015,35 @@ get.hwse2.coxph <- function(
 
 			if (mi > 0) {
 				directory.name <- paste0(directory.name, "/mi race")
-				}
+			}
+		}
 
-			# Make directories, if they don't exist
-			sapply(directory.name, dir.create, showWarnings = F, recursive = T)
 
-			# Get data to impute
-			if (mi > 0) {
+		# # Test
+		# cat("\n")
+		# cat(paste0(gsub("//", "/", paste0(directory.name,
+		# 																	ifelse(mi > 0, paste0("/", code), ""))), collapse = "\n"))
+
+		# Make directories, if they don't exist
+		sapply(gsub("//", "/", paste0(directory.name, ifelse(mi > 0, paste0("/", code), ""))), dir.create, showWarnings = F, recursive = T)
+
+		# Get data to impute
+		if (mi > 0) {
+			if (!paste0(gsub(" ", "_", code), ".mi_race.M", mi, ".hwse2") %in% ls(envir = .GlobalEnv)) {
 				to_impute <- get.mi_race(dat, mi, race.imputed.melt)
 				assign(paste0(
 					gsub(" ", "_", code),
 					".mi_race.M", mi, ".hwse2"),
 					to_impute, inherits = T)
+			} else {
+				to_impute <- get(paste0(gsub(" ", "_", code), ".mi_race.M", mi, ".hwse2"))
 			}
+		}
 
+		# Run model conditional
+		if (run_model) {
 			# Multiple imputation loop ####
-			lapply(if (mi == 0) {0} else {1:mi}, function(m = 1) {
+			lapply(if (mi == 0) {0} else {start_m:mi}, function(m = 1) {
 
 				if (mi > 0) {
 
@@ -1032,48 +1066,60 @@ get.hwse2.coxph <- function(
 				}
 
 
-			# Fit model ####
-			invisible(sapply(1:length(basic_formula), function(j = 1) {
-				tmp.coxph <- coxph(
-					as.formula(basic_formula[[j]]),
-					data = {
-						if (!grepl('breast|female|prosate', description, ignore.case = T)) {
-							dat
-						} else {
-							dat[Sex == ifelse(grepl('breast|female', description, ignore.case = T), "Female", "Male")]
-						}
-					},
-					method = "efron")
+				# Fit model ####
+				invisible(sapply(1:length(basic_formula), function(j = 1) {
+					tmp.coxph <- coxph(
+						as.formula(basic_formula[[j]]),
+						data = {
+							if (!grepl('breast|female|prosate', description, ignore.case = T)) {
+								dat
+							} else {
+								dat[Sex == ifelse(grepl('breast|female', description, ignore.case = T), "Female", "Male")]
+							}
+						},
+						method = "efron")
 
-				# Save model  ####
+					# Save model  ####
+					final_name <- paste(
+						gsub("//", "/", paste0(directory.name[j], ifelse(mi > 0, paste0("/", code), ""))),
+						paste0(code,
+									 ifelse(
+									 	is.finite(messy_sol),
+									 	paste0("_sol", messy_sol %/% .01),
+									 	""),
+									 ifelse(spline_year,
+									 			 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+									 			 ifelse(spline_yin, paste0("_splinedyin"), "")),
+									 ifelse(mi > 0, paste0(".m", m), ""),
+									 ".coxph.rds"),
+						sep = "/"
+					)
 
-				saveRDS(tmp.coxph,
-								file = paste(
-									directory.name[j],
-									paste0(code,
-												 ifelse(
-												 	is.finite(messy_sol),
-												 	paste0("_sol", messy_sol %/% .01),
-												 	""),
-												 ifelse(spline_year,
-												 			 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-												 			 ifelse(spline_yin, paste0("_splinedyin"), "")),
-												 ifelse(mi > 0, paste0(".m", m), ""),
-												 ".coxph.rds"),
-									sep = "/"
-								))
+					message(paste0("\nSaving model to:\n",
+												 final_name))
+					saveRDS(tmp.coxph,
+									file = final_name)
 
-				cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
-				print(unlist(description))
-				cat("\n")
-				if (mi > 0) {cat(paste0("m = ", m, "\n"))}
-				cat(paste0(tmp.coxph$nevent, " cases"))
-				cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
-				print(tmp.coxph)
-			}))
-}) # End MI loop
-		}
-	}))
+					# Print to console ####
+					cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
+					cat(unlist(description))
+					cat("\n")
+					if (mi > 0) {cat(paste0("m = ", m, "\n"))}
+					cat(paste0(tmp.coxph$nevent, " cases"))
+					# Time elapsed
+					since_start <- time_length(difftime(Sys.time(), start), "minutes")
+					if (since_start <= 90) {
+						cat(paste0("\n", round(since_start, 2), " minutes since get.hwse2.coxph() was called."))
+					} else {
+						cat(paste0("\n", round(since_start/60, 3), " hours since get.hwse2.coxph() was called."))
+					}
+					cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
+					print(summary(tmp.coxph)$coefficients)
+				}))
+			}) # End MI loop
+		} # Run model conditional
+	} # End loop over outcomes
+	# )) # End sapply over outcomes
 	options(warn = 0)
 }
 
@@ -1129,14 +1175,17 @@ get.hwse3.coxph <- function(
 	new_dat = T,
 	save_dat = T,
 	messy_sol = 0.05,
-	spline_year = T,
-	spline_yin = T,
+	spline_year = F,
+	spline_yin = F,
 	time_scale = "age",
 	additional.lag = 21,
 	employment_status.lag = 21,
 	directory.name = NULL,
 	year.max = Inf,
 	mi = 0) {
+
+	# start time
+	start <- Sys.time()
 
 	options(warn = 2)
 
@@ -1237,13 +1286,14 @@ get.hwse3.coxph <- function(
 	}
 
 	# Get data to impute
-		if (mi > 0) {
+	if (mi > 0) {
+		if (!paste0("mi_race.M", mi, ".hwse3") %in% ls(envir = .GlobalEnv)) {
 			to_impute <- get.mi_race(dat, mi, race.imputed.melt)
-			assign(paste0(
-				gsub(" ", "_", code),
-				".mi_race.M", mi, ".hwse3"),
-			to_impute, inherits = T)
+			assign(paste0("mi_race.M", mi, ".hwse3"), to_impute, inherits = T)
+		} else {
+			to_impute <- get(paste0("mi_race.M", mi, ".hwse3"))
 		}
+	}
 
 	if (run_model) {
 		# Multiple imputation loop ####
@@ -1269,85 +1319,93 @@ get.hwse3.coxph <- function(
 				table(dat[immortal != 1 & right.censored != 1]$Race, useNA = "always")
 			}
 
-		dat <- dat[immortal != 1 & right.censored != 1]
-		Sys.sleep(0)
-		# Fit model ####
-		tmp.coxph <- coxph(as.formula(
-			paste(
-				ifelse(
-					grepl("age", time_scale),
-					"Surv(age.year1, age.year2, status) ~",
-					"Surv(year1, year2, status) ~"
-				),
-				"`Cumulative straight` +",
-				ifelse(
-					!is.finite(messy_sol),
-					"`Cumulative soluble` +",
-					paste0("`Cumulative soluble", paste0(" ", messy_sol %/% 0.01), "` +")),
-				"`Cumulative synthetic` +",
-				ifelse(
-					grepl("age", time_scale),
-					ifelse(!spline_year, "Year +", "pspline(year, df = 0) +"),
-					"Age +"
-				),
-				ifelse(
-					!spline_yin,
-					"`Year of hire` + ",
-					"pspline(yin.gm, df = 0) +"
-				),
-				"Race + Plant + Sex"
-			)
-		),
-		data = dat,
-		method = "efron")
+			dat <- dat[immortal != 1 & right.censored != 1]
+			Sys.sleep(0)
+			# Fit model ####
+			tmp.coxph <- coxph(as.formula(
+				paste(
+					ifelse(
+						grepl("age", time_scale),
+						"Surv(age.year1, age.year2, status) ~",
+						"Surv(year1, year2, status) ~"
+					),
+					"`Cumulative straight` +",
+					ifelse(
+						!is.finite(messy_sol),
+						"`Cumulative soluble` +",
+						paste0("`Cumulative soluble", paste0(" ", messy_sol %/% 0.01), "` +")),
+					"`Cumulative synthetic` +",
+					ifelse(
+						grepl("age", time_scale),
+						ifelse(!spline_year, "Year +", "pspline(year, df = 0) +"),
+						"Age +"
+					),
+					ifelse(
+						!spline_yin,
+						"`Year of hire` + ",
+						"pspline(yin.gm, df = 0) +"
+					),
+					"Race + Plant + Sex"
+				)
+			),
+			data = dat,
+			method = "efron")
 
-		if (is.null(directory.name)) {
-			directory.name <- to_drive_D(here::here(paste0(
-				'./resources/hwse 3',
-				ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
-				"/Lag ", 1 + additional.lag,
-				ifelse(employment_status.lag != 0,
-							 paste0("/Employment status lagged ", employment_status.lag, " years"),
-							 ""),
-				ifelse( !grepl("age", time_scale),
-								"/indexed by calendar",
-								"/indexed by age"),
-				ifelse(mi > 0, "/mi race")
-			)))
+			if (is.null(directory.name)) {
+				directory.name <- to_drive_D(here::here(paste0(
+					'./resources/hwse 3',
+					ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
+					"/Lag ", 1 + additional.lag,
+					ifelse(employment_status.lag != 0,
+								 paste0("/Employment status lagged ", employment_status.lag, " years"),
+								 ""),
+					ifelse( !grepl("age", time_scale),
+									"/indexed by calendar",
+									"/indexed by age"),
+					ifelse(mi > 0, "/mi race")
+				)))
 			}
 
-		dir.create(directory.name, showWarnings = F, recursive = T)
+			dir.create(directory.name, showWarnings = F, recursive = T)
 
-		# Save model  ####
-		saveRDS(tmp.coxph,
-						file = paste(
-							directory.name,
-							gsub("^_", "", paste0(
-								ifelse(
-									is.finite(messy_sol),
-									paste0("_sol", messy_sol %/% .01),
-									""),
-								ifelse(spline_year,
-											 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-											 ifelse(spline_yin, paste0("_splinedyin"), "")),
-								ifelse(mi > 0, paste0(".m", m), ""),
-								".coxph.rds")),
-							sep = "/"
-						))
+			# Save model  ####
+			saveRDS(tmp.coxph,
+							file = paste(
+								directory.name,
+								gsub("^_", "", paste0(
+									ifelse(
+										is.finite(messy_sol),
+										paste0("_sol", messy_sol %/% .01),
+										""),
+									ifelse(spline_year,
+												 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
+												 ifelse(spline_yin, paste0("_splinedyin"), "")),
+									ifelse(mi > 0, paste0(".m", m), ""),
+									".coxph.rds")),
+								sep = "/"
+							))
 
-		# if (nrow(dat[age.year2 <= age.year1]) > 0) {
-		# 	nrow(dat[age.year2 <= age.year1])
-		# }
+			# if (nrow(dat[age.year2 <= age.year1]) > 0) {
+			# 	nrow(dat[age.year2 <= age.year1])
+			# }
 
-		cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
-		print("HWSE Condition 3: previous MWF exposure as a predictor of leaving work")
-		cat("\n")
-		if (mi > 0) {cat(paste0("m = ", m, "\n"))}
-		cat(paste0(tmp.coxph$nevent, " cases"))
-		cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
-		print(tmp.coxph)
+			# Print to console ####
+			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
+			print("HWSE Condition 3: previous MWF exposure as a predictor of leaving work")
+			cat("\n")
+			if (mi > 0) {cat(paste0("m = ", m, "\n"))}
+			cat(paste0(tmp.coxph$nevent, " cases"))
+			# Time elapsed
+			since_start <- time_length(difftime(Sys.time(), start), "minutes")
+			if (since_start <= 90) {
+				cat(paste0("\n", round(since_start, 2), " minutes since get.hwse2.coxph() was called."))
+			} else {
+				cat(paste0("\n", round(since_start/60, 3), " hours since get.hwse2.coxph() was called."))
+			}
+			cat(paste0("\n", paste0(rep("_", 80), collapse = ""), "\n"))
+			print(summary(tmp.coxph)$coefficients)
 
-	}) # End mi loop
+		}) # End mi loop
 	}
 	options(warn = 0)
 }
@@ -1357,10 +1415,10 @@ get.coef <- function(
 	outcomes = outcomes.which,
 	cohort_name = NULL,
 	analytic.name = NULL,
-	new_dat = F,
+	new_dat = T,
 	messy_sol = 0.05,
-	spline_year = T,
-	spline_yin = T,
+	spline_year = F,
+	spline_yin = F,
 	time_scale = "age",
 	employment.which = "Binary",
 	hwse2 = F,
@@ -1374,6 +1432,9 @@ get.coef <- function(
 	year.max = Inf,
 	mi = 0
 ) {
+
+	# start time
+	start <- Sys.time()
 
 	if (hwse3) {
 		outcomes <- 1
@@ -1393,18 +1454,20 @@ get.coef <- function(
 		# Get data ####
 		if (is.null(analytic.name)) {
 			if (!hwse2 & !hwse3) {
-				if (!(paste0(code, ".dat") %in% ls()) | new_dat) {
+				if (!(paste0(code, ".dat") %in% ls()) | new_dat |
+						!(paste0(gsub(" ", "_", code), ".mi_race.M", mi) %in% ls())) {
 					get.coxph(cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag)
 				}
 				dat.og <- as.data.table(as.data.frame(get(paste0(code, ".dat"))))
 			} else  if (hwse2) {
-				if (!(paste0(code, ".dat2") %in% ls()) | new_dat) {
+				if (!(paste0(code, ".dat2") %in% ls()) | new_dat |
+						!(paste0(gsub(" ", "_", code), ".mi_race.M", mi, ".hwse2") %in% ls())) {
 					get.hwse2.coxph(
-						cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag,
-						employment_status.lag = employment_status.lag)}
+						cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag, employment_status.lag = employment_status.lag, year.max = year.max)}
 				dat.og <- as.data.table(as.data.frame(get(paste0(code, ".dat2"))))
 			} else if (hwse3) {
-				if (!("dat3" %in% ls()) | new_dat) {
+				if (!("dat3" %in% ls()) | new_dat |
+						!(paste0(gsub(" ", "_", code), ".mi_race.M", mi, ".hwse3") %in% ls())) {
 					get.hwse3.coxph(cohort_name = cohort_name, run_model = F, additional.lag = additional.lag,
 													employment_status.lag = employment_status.lag,
 													year.max = year.max)
@@ -1425,301 +1488,309 @@ get.coef <- function(
 
 		# Get MI race data
 		if (mi > 0) {
-			to_impute <- get(paste0(gsub(" ", "_", code),
-															".mi_race.M", mi,
-															ifelse(!hwse2 & !hwse3, "", ifelse(!hwse2, ".hwse3", ".hwse2"))
+			to_impute <- get(
+				gsub("^\\.", "", paste0(gsub(" ", "_", code), ".mi_race.M", mi, ifelse(!hwse2 & !hwse3, "", ifelse(!hwse2, ".hwse3", ".hwse2")))
 			))}
 
 		# Loop over mi ####
-		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 1) {
-
-		if (is.null(mod.name)) {
-			mod.name <- paste0(
-			code,
-			ifelse(is.finite(messy_sol), # & !(hwse2 | hwse3),
-						 paste0("_sol", messy_sol %/% .01), ""),
-			ifelse(spline_year,
-						 ifelse(spline_yin,
-						 			 paste0("_splined"),
-						 			 "_splinedyear"),
-						 ifelse(spline_yin,
-						 			 paste0("_splinedyin"),
-						 			 "")),
-			ifelse(mi > 0, paste0(".m", m), ""),
-			".coxph", '.rds')
-
-		mod.name <- gsub("^_", "", mod.name)}
-
-		if (is.null(mod.directory)) {
-			mod.directory <- to_drive_D(here::here(
-				paste(
-					"./resources",
-					ifelse(!(hwse2 | hwse3),
-								 paste0("lag ", exposure.lag + additional.lag),
-								 paste0(
-								 	ifelse(hwse2, "hwse 2", "hwse 3"),
-								 	ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
-								 	"/Lag ", 1 + additional.lag,
-								 	ifelse(employment_status.lag != 0,
-								 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
-								 				 ""))),
-					ifelse(!grepl("age", time_scale),
-								 paste("indexed by calendar",
-								 			ifelse(hwse2, employment.which, ""),
-								 			sep = "/"),
-								 paste("indexed by age",
-								 			ifelse(hwse2, employment.which, ""), sep = "/")),
-					ifelse(mi > 0, "mi race", ""),
-					sep = "/")))
+		if (mi > 0) {
+			message(paste0("Combining M = ", mi, " model estimates for: ", description,
+										 ifelse(hwse2, paste0(" and leaving work (", employment.which, ")"), "")))
+			pb <- txtProgressBar(min = 0, max = mi, style = 3)
 		}
+		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 31) {
 
-		# Get model ####
-		tmp.coxph <- readRDS(gsub("//", "/", paste0(mod.directory, "/", mod.name)))
+			if (is.null(mod.name)) {
+				mod.name <- paste0(
+					code,
+					ifelse(is.finite(messy_sol), # & !(hwse2 | hwse3),
+								 paste0("_sol", messy_sol %/% .01), ""),
+					ifelse(spline_year,
+								 ifelse(spline_yin,
+								 			 paste0("_splined"),
+								 			 "_splinedyear"),
+								 ifelse(spline_yin,
+								 			 paste0("_splinedyin"),
+								 			 "")),
+					ifelse(mi > 0, paste0(".m", m), ""),
+					".coxph", '.rds')
 
-		library(mgcv)
-		if (!"gam" %in% class(tmp.coxph)) {
-			tmp.coef <- summary(tmp.coxph)$coefficients
-		} else {
-			tmp.coef <- rbind(summary(tmp.coxph)$p.table,
-												summary(tmp.coxph)$s.table)
-		}
-		tmp.coef <- cbind(rownames(tmp.coef), tmp.coef)
-		if ("coxph" %in% class(tmp.coxph)) {
-			colnames(tmp.coef)[grep(
-				"^$|coef|se(coef)|Chisq|p",
-				colnames(tmp.coef))] <- c("Covariate", "Estimate", "SE", "t", "p")
-		} else {
-			colnames(tmp.coef)[1:5] <- c("Covariate", "Estimate", "SE", "t", "p")
-		}
-		tmp.coef <- as.data.table(tmp.coef)
+				mod.name <- gsub("^_", "", mod.name)
+			}
 
-		# Clean covariate name
-		covariates <- names(attr(tmp.coxph$terms, "dataClasses"))
-		covariates <- covariates[!grepl("Surv|strata\\(.*\\)|status", covariates)]
-		quote.which <- which(grepl(" ", covariates) & !grepl("pspline|", covariates))
-		covariates[quote.which] <- paste0("`", covariates[quote.which], "`")
-		if ("gam" %in% class(tmp.coxph)) {
-			covariates <- c("(Intercept)", covariates)
-		}
+			if (is.null(mod.directory)) {
+				mod.directory <- to_drive_D(here::here(
+					paste(
+						"./resources",
+						ifelse(!(hwse2 | hwse3),
+									 paste0("lag ", exposure.lag + additional.lag),
+									 paste0(
+									 	ifelse(hwse2, "hwse 2", "hwse 3"),
+									 	ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
+									 	"/Lag ", 1 + additional.lag,
+									 	ifelse(employment_status.lag != 0,
+									 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
+									 				 ""))),
+						ifelse(!grepl("age", time_scale),
+									 paste("indexed by calendar",
+									 			ifelse(hwse2, employment.which, ""),
+									 			sep = "/"),
+									 paste("indexed by age",
+									 			ifelse(hwse2, employment.which, ""), sep = "/")),
+						ifelse(mi > 0, paste0("mi race/", code), ""),
+						sep = "/")))
+			}
 
-		covariate.levels <- tmp.coxph$xlevels
+			# Get model ####
+			# message(gsub("/./", "/", paste0("Reading file: ", gsub("//", "/", paste0(mod.directory, "/", mod.name)))))
+			if (mi > 0) {setTxtProgressBar(pb, m)}
+			tmp.coxph <- readRDS(gsub("//", "/", paste0(mod.directory, "/", mod.name)))
+			# tmp.coxph
 
-		tmp.coef[!grepl(ifelse("gam" %in% class(tmp.coxph),
-													 "^s\\(", "pspline\\("), Covariate),
-						 Covariate := {
-						 	covariates <- sapply(covariate.levels, function(x) {length(x)})
-						 	unlist(sapply(1:length(covariates), function(i) {
-						 		rep(names(covariates)[i], covariates[i] - 1)}))
-						 }]
+			library(mgcv)
+			if (!"gam" %in% class(tmp.coxph)) {
+				tmp.coef <- summary(tmp.coxph)$coefficients
+			} else {
+				tmp.coef <- rbind(summary(tmp.coxph)$p.table,
+													summary(tmp.coxph)$s.table)
+			}
+			tmp.coef <- cbind(rownames(tmp.coef), tmp.coef)
+			if ("coxph" %in% class(tmp.coxph)) {
+				colnames(tmp.coef)[grep(
+					"^$|Covariate|^coef|^Estimate|^se|^SE|^z|^t|^Pr|^p",
+					colnames(tmp.coef))] <- c("Covariate", "Estimate", "SE", "t", "p")
+			} else {
+				colnames(tmp.coef)[1:5] <- c("Covariate", "Estimate", "SE", "t", "p")
+			}
+			tmp.coef <- as.data.table(tmp.coef)
 
-		tmp.coef[grepl(
-			ifelse("gam" %in% class(tmp.coxph), "^s\\(", "pspline\\("), Covariate),`:=`(
-				Covariate = as.vector(sapply(covariates[grepl(ifelse("gam" %in% class(tmp.coxph),
-																														 "^s\\(", "pspline\\("), covariates)], rep, 2))
+			# Clean covariate name
+			covariates <- names(attr(tmp.coxph$terms, "dataClasses"))
+			covariates <- covariates[!grepl("Surv|strata\\(.*\\)|status", covariates)]
+			quote.which <- which(grepl(" ", covariates) & !grepl("pspline|", covariates))
+			covariates[quote.which] <- paste0("`", covariates[quote.which], "`")
+			if ("gam" %in% class(tmp.coxph)) {
+				covariates <- c("(Intercept)", covariates)
+			}
+
+			covariate.levels <- tmp.coxph$xlevels
+
+			tmp.coef[!grepl(ifelse("gam" %in% class(tmp.coxph),
+														 "^s\\(", "pspline\\("), Covariate),
+							 Covariate := {
+							 	covariates <- sapply(covariate.levels, function(x) {length(x)})
+							 	unlist(sapply(1:length(covariates), function(i) {
+							 		rep(names(covariates)[i], covariates[i] - 1)}))
+							 }]
+
+			tmp.coef[grepl(
+				ifelse("gam" %in% class(tmp.coxph), "^s\\(", "pspline\\("), Covariate),`:=`(
+					Covariate = as.vector(sapply(covariates[grepl(ifelse("gam" %in% class(tmp.coxph),
+																															 "^s\\(", "pspline\\("), covariates)], rep, 2))
+				)]
+
+			# Clean levels
+			tmp.coef[grep("soluble_", Covariate), Covariate := "Cumulative_soluble_5"]
+			tmp.coef[
+				gsub("`", "", Covariate) %in% names(covariate.levels), `:=`(
+					level = unlist(
+						sapply(names(covariate.levels)[
+							names(covariate.levels) %in% gsub("`", "", tmp.coef$Covariate)],
+							function(x) {
+								unlist(covariate.levels[names(covariate.levels) == x])[-1]
+							}))
+				)]
+
+			# Confidence intervals
+			tmp.coef <- tmp.coef[, .(
+				Covariate = gsub("`", "", Covariate),
+				level,
+				HR = exp(as.numeric(Estimate)),
+				lower.ci = exp(as.numeric(Estimate) -
+											 	qnorm(0.975) * as.numeric(SE)),
+				upper.ci = exp(as.numeric(Estimate) +
+											 	qnorm(0.975) * as.numeric(SE)),
+				log_SE = as.numeric(SE),
+				p = as.numeric(`p`),
+				lower = substr(level,
+											 unlist(gregexpr(
+											 	"\\(", level
+											 )) + 1,
+											 unlist(gregexpr(",", level)) - 1),
+				upper = substr(level,
+											 unlist(gregexpr(",", level)) + 1,
+											 unlist(gregexpr(
+											 	"\\]", level
+											 )) - 1)
 			)]
 
-		# Clean levels
-		tmp.coef[grep("soluble_", Covariate), Covariate := "Cumulative_soluble_5"]
-		tmp.coef[
-			gsub("`", "", Covariate) %in% names(covariate.levels), `:=`(
-				level = unlist(
-					sapply(names(covariate.levels)[
-						names(covariate.levels) %in% gsub("`", "", tmp.coef$Covariate)],
-						function(x) {
-							unlist(covariate.levels[names(covariate.levels) == x])[-1]
-						}))
-			)]
+			# Need for getting spline df
+			full.covariates <- unique(tmp.coef$Covariate)
 
-		# Confidence intervals
-		tmp.coef <- tmp.coef[, .(
-			Covariate = gsub("`", "", Covariate),
-			level,
-			HR = exp(as.numeric(Estimate)),
-			lower.ci = exp(as.numeric(Estimate) -
-										 	qnorm(0.975) * as.numeric(SE)),
-			upper.ci = exp(as.numeric(Estimate) +
-										 	qnorm(0.975) * as.numeric(SE)),
-			log_SE = as.numeric(SE),
-			p = {if (spline_year | spline_yin) {as.numeric(`p`)
-			} else {as.numeric(`Pr(>|z|)`)}},
-			lower = substr(level,
-										 unlist(gregexpr(
-										 	"\\(", level
-										 )) + 1,
-										 unlist(gregexpr(",", level)) - 1),
-			upper = substr(level,
-										 unlist(gregexpr(",", level)) + 1,
-										 unlist(gregexpr(
-										 	"\\]", level
-										 )) - 1)
-		)]
+			# Set aside splined stuff
+			if (spline_year | spline_yin) {
+				tmp.spline.coef <- tmp.coef[grepl("pspline|^s\\(", Covariate)]
+				tmp.spline.coef[, `:=`(
+					Covariate = substr(
+						Covariate, 1, gregexpr("\\)", Covariate))
+				)]
+				tmp.coef <- tmp.coef[!grepl("pspline|^s\\(", Covariate)]
+			}
 
-		# Need for getting spline df
-		full.covariates <- unique(tmp.coef$Covariate)
+			covariates <- unique(tmp.coef$Covariate)
 
-		# Set aside splined stuff
-		if (spline_year | spline_yin) {
-			tmp.spline.coef <- tmp.coef[grepl("pspline|^s\\(", Covariate)]
-			tmp.spline.coef[, `:=`(
-				Covariate = substr(
-					Covariate, 1, gregexpr("\\)", Covariate))
-			)]
-			tmp.coef <- tmp.coef[!grepl("pspline|^s\\(", Covariate)]
-		}
+			# Pretty covariate/level ####
+			tmp.coef <- rbindlist(lapply(
+				covariates[which(covariates != "(Intercept)")],
+				function(x = covariates[4]) {
+					# Get relevant rows
+					dat <- tmp.coef[grep(paste0(x, "$"), tmp.coef$Covariate), ]
 
-		covariates <- unique(tmp.coef$Covariate)
+					# Make pretty level
+					lower <- dat$lower
+					upper <- dat$upper
+					if (!hwse2) {
+						# Pretty levels Exposure-outcome ####
+						if (grepl("Cumu", x)) {
+							level <- paste0("$>", lower, "$ to $", upper, "$")
+							level[grep("Inf", upper)] <-
+								paste0("$>", lower[grep("Inf", upper)], "$")
+						} else if (grepl("Year|Age", x)) {
+							level <- paste0("$", as.numeric(lower) + 1, "$ to $", upper, "$")
+							level[grep("Inf", upper)] <-
+								paste0("$>", lower[grep("Inf", upper)], "$")
+						} else if (grepl("Race", x)) {
+							level <- levels(dat.og$Race)[-1]
+						} else if (grepl("Plant", x)) {
+							level <- levels(dat.og$Plant)[-1]
+						} else if (grepl("Sex", x)) {
+							level <- levels(dat.og$Sex)[-1]
+						}
 
-		# Pretty covariate/level ####
-		tmp.coef <- rbindlist(lapply(
-			covariates[which(covariates != "(Intercept)")],
-			function(x = covariates[4]) {
-				# Get relevant rows
-				dat <- tmp.coef[grep(paste0(x, "$"), tmp.coef$Covariate), ]
+						dat$level <- level
 
-				# Make pretty level
-				lower <- dat$lower
-				upper <- dat$upper
-				if (!hwse2) {
-					# Pretty levels Exposure-outcome ####
-					if (grepl("Cumu", x)) {
-						level <- paste0("$>", lower, "$ to $", upper, "$")
-						level[grep("Inf", upper)] <-
-							paste0("$>", lower[grep("Inf", upper)], "$")
-					} else if (grepl("Year|Age", x)) {
-						level <- paste0("$", as.numeric(lower) + 1, "$ to $", upper, "$")
-						level[grep("Inf", upper)] <-
-							paste0("$>", lower[grep("Inf", upper)], "$")
-					} else if (grepl("Race", x)) {
-						level <- levels(dat.og$Race)[-1]
-					} else if (grepl("Plant", x)) {
-						level <- levels(dat.og$Plant)[-1]
-					} else if (grepl("Sex", x)) {
-						level <- levels(dat.og$Sex)[-1]
+						# Get referent level
+						if (grepl("Cumu", x)) {
+							ref.lower <- -Inf
+							ref.upper <- min(as.numeric(lower))
+							ref.level <-
+								ifelse(ref.upper == 0,
+											 "$0$",
+											 paste0("$", 0, "$ to $", ref.upper, "$"))
+						} else if (grepl("Year|Age", x)) {
+							ref.lower <- ifelse(grepl("Year$", x), 1973,
+																	ifelse(grepl("hire$", x), 1938,
+																				 floor(min(
+																				 	dat.og$age.year2
+																				 ) / 365)))
+							ref.upper <- min(as.numeric(lower))
+							ref.level <- paste0("$", ref.lower, "$ to $", ref.upper, "$")
+						} else if (grepl("Race", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level = "White"
+						} else if (grepl("Plant", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level <- "1"
+						} else if (grepl("Sex", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level <- "Male"
+							level <- levels(dat.og$Sex)[-1]
+						}
 					}
 
-					dat$level <- level
+					if (hwse2) {
+						# Pretty levels HWSE 2 ####
+						if (grepl("Employ", x)) {
+							if (grepl("Binary", employment.which, ignore.case = T)) {
+								level <- c("Not employed")}
+							if (grepl("50", employment.which, ignore.case = T)) {
+								level <- c("Left work (under 50)",
+													 "Left work (50 or older)")}
+							if (grepl("55", employment.which, ignore.case = T)) {
+								level <- c("Left work (under 55)",
+													 "Left work (55 or older)")}
+							if (grepl("60", employment.which, ignore.case = T)) {
+								level <- c("Left work (under 60)",
+													 "Left work (60 or older)")}
+						} else  if (grepl("Duration", x)) {
+							level <- paste0("$>", lower, "$ to $", upper, "$")
+							level[grep("Inf", upper)] <-
+								paste0("$>", lower[grep("Inf", upper)], "$")
+						} else if (grepl("Cumu", x)) {
+							level <- paste0("$>", lower, "$ to $", upper, "$")
+							level[grep("Inf", upper)] <-
+								paste0("$>", lower[grep("Inf", upper)], "$")
+						} else if (grepl("Year|Age", x)) {
+							level <- paste0("$", as.numeric(lower) + 1, "$ to $", upper, "$")
+							level[grep("Inf", upper)] <-
+								paste0("$>", lower[grep("Inf", upper)], "$")
+						} else if (grepl("Race", x)) {
+							level <- levels(dat.og$Race)[-1]
+						} else  if (grepl("Plant", x)) {
+							level <- levels(dat.og$Plant)[-1]
+						} else if (grepl("Sex", x)) {
+							level <- levels(dat.og$Sex)[-1]
+						}
 
-					# Get referent level
-					if (grepl("Cumu", x)) {
-						ref.lower <- -Inf
-						ref.upper <- min(as.numeric(lower))
-						ref.level <-
-							ifelse(ref.upper == 0,
-										 "$0$",
-										 paste0("$", 0, "$ to $", ref.upper, "$"))
-					} else if (grepl("Year|Age", x)) {
-						ref.lower <- ifelse(grepl("Year$", x), 1973,
-																ifelse(grepl("hire$", x), 1938,
-																			 floor(min(
-																			 	dat.og$age.year2
-																			 ) / 365)))
-						ref.upper <- min(as.numeric(lower))
-						ref.level <- paste0("$", ref.lower, "$ to $", ref.upper, "$")
-					} else if (grepl("Race", x)) {
-						ref.upper <- NA
-						ref.lower <- NA
-						ref.level = "White"
-					} else if (grepl("Plant", x)) {
-						ref.upper <- NA
-						ref.lower <- NA
-						ref.level <- "1"
-					} else if (grepl("Sex", x)) {
-						ref.upper <- NA
-						ref.lower <- NA
-						ref.level <- "Male"
-						level <- levels(dat.og$Sex)[-1]
+						if (length(level) != length(dat$level)) {
+							stop(paste0("\nIncorrect number of levels for covariate: ", x,
+													ifelse(mi > 0, paste0("\n m = ", m), "")))
+						}
+						dat$level <- level
+
+						# Get referent level
+						if (grepl("Employ", x)) {
+							ref.upper <- ref.lower <- NA
+							ref.level <- "Still employed"
+						} else  if (grepl("Duration", x)) {
+							ref.lower <- -Inf
+							ref.upper <- min(as.numeric(lower))
+							ref.level <-
+								ifelse(ref.upper == 0,
+											 "$0$",
+											 paste0("$", 0, "$ to $", ref.upper, "$"))
+						} else if (grepl("Cumu", x)) {
+							ref.lower <- -Inf
+							ref.upper <- min(as.numeric(lower))
+							ref.level <-
+								ifelse(ref.upper == 0,
+											 "$0$",
+											 paste0("$", 0, "$ to $", ref.upper, "$"))
+						} else if (grepl("Year|Age", x)) {
+							ref.lower <- ifelse(grepl("Year$", x),
+																	1973,
+																	ifelse(grepl("hire$", x), 1938,
+																				 floor(
+																				 	min(dat.og$age.year2) / 365
+																				 )))
+							ref.upper <- min(as.numeric(lower))
+							ref.level <-
+								paste0("$", ref.lower, "$ to $", ref.upper, "$")
+						} else if (grepl("Race", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level = "White"
+						} else if (grepl("Plant", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level <- "1"
+						} else if (grepl("Sex", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level <- "Male"
+							level <- levels(dat.og$Sex)[-1]
+						}
 					}
-				}
 
-				if (hwse2) {
-					# Pretty levels HWSE 2 ####
-					if (grepl("Employ", x)) {
-						if (grepl("Binary", employment.which, ignore.case = T)) {
-							level <- c("Not employed")}
-						if (grepl("50", employment.which, ignore.case = T)) {
-							level <- c("Left work (under 50)",
-												 "Left work (50 or older)")}
-						if (grepl("55", employment.which, ignore.case = T)) {
-							level <- c("Left work (under 55)",
-												 "Left work (55 or older)")}
-						if (grepl("60", employment.which, ignore.case = T)) {
-							level <- c("Left work (under 60)",
-												 "Left work (60 or older)")}
-					} else  if (grepl("Duration", x)) {
-						level <- paste0("$>", lower, "$ to $", upper, "$")
-						level[grep("Inf", upper)] <-
-							paste0("$>", lower[grep("Inf", upper)], "$")
-					} else if (grepl("Cumu", x)) {
-						level <- paste0("$>", lower, "$ to $", upper, "$")
-						level[grep("Inf", upper)] <-
-							paste0("$>", lower[grep("Inf", upper)], "$")
-					} else if (grepl("Year|Age", x)) {
-						level <- paste0("$", as.numeric(lower) + 1, "$ to $", upper, "$")
-						level[grep("Inf", upper)] <-
-							paste0("$>", lower[grep("Inf", upper)], "$")
-					} else if (grepl("Race", x)) {
-						level <- levels(dat.og$Race)[-1]
-					} else  if (grepl("Plant", x)) {
-						level <- levels(dat.og$Plant)[-1]
-					} else if (grepl("Sex", x)) {
-						level <- levels(dat.og$Sex)[-1]
+					# Get case count
+					if (!x %in% names(dat.og)) {
+						x <- gsub("`", "", x)
 					}
-
-					if (length(level) != length(dat$level)) {
-						stop(paste0("Incorrect number of levels for covariate: ", print(x)))
-					}
-					dat$level <- level
-
-					# Get referent level
-					if (grepl("Employ", x)) {
-						ref.upper <- ref.lower <- NA
-						ref.level <- "Still employed"
-					} else  if (grepl("Duration", x)) {
-						ref.lower <- -Inf
-						ref.upper <- min(as.numeric(lower))
-						ref.level <-
-							ifelse(ref.upper == 0,
-										 "$0$",
-										 paste0("$", 0, "$ to $", ref.upper, "$"))
-					} else if (grepl("Cumu", x)) {
-						ref.lower <- -Inf
-						ref.upper <- min(as.numeric(lower))
-						ref.level <-
-							ifelse(ref.upper == 0,
-										 "$0$",
-										 paste0("$", 0, "$ to $", ref.upper, "$"))
-					} else if (grepl("Year|Age", x)) {
-						ref.lower <- ifelse(grepl("Year$", x),
-																1973,
-																ifelse(grepl("hire$", x), 1938,
-																			 floor(
-																			 	min(dat.og$age.year2) / 365
-																			 )))
-						ref.upper <- min(as.numeric(lower))
-						ref.level <-
-							paste0("$", ref.lower, "$ to $", ref.upper, "$")
-					} else if (grepl("Race", x)) {
-						ref.upper <- NA
-						ref.lower <- NA
-						ref.level = "White"
-					} else if (grepl("Plant", x)) {
-						ref.upper <- NA
-						ref.lower <- NA
-						ref.level <- "1"
-					} else if (grepl("Sex", x)) {
-						ref.upper <- NA
-						ref.lower <- NA
-						ref.level <- "Male"
-						level <- levels(dat.og$Sex)[-1]
-					}
-				}
-
-				# Get case count
-				if (!x %in% names(dat.og)) {
-					x <- gsub("`", "", x)
-				}
-				n <- as.vector(table(dat.og[status == 1, x, with = F]))
-				# MI race?
+					n <- as.vector(table(dat.og[status == 1, x, with = F]))
+					# MI race?
 					if (grepl("Race", x) & mi > 0) {
 						race.mi <- merge(dat.og[status == 1, .(studyno, year, finrace, Race)], to_impute[[m]][,.(studyno, year, Race.impute)],
 														 on = c("studyno", "Year"),
@@ -1727,43 +1798,44 @@ get.coef <- function(
 						race.mi[finrace %in% c(0, 9), `:=`(Race = Race.impute)]
 						n <- as.vector(table(race.mi[, x, with = F]))
 					}
-				if (length(n) - 1 != length(dat$level)) {
-					stop(paste0("Incorrect number of levels (counts) for covariate: ", print(x)))
-				}
-				dat$n <- n[-1]
+					if (length(n) - 1 != length(dat$level)) {
+						stop(paste0("\nIncorrect number of levels for covariate: ", x,
+												ifelse(mi > 0, paste0("\n m = ", m), "")))
+					}
+					dat$n <- n[-1]
 
-				# Make data.table
-				rbindlist(list(
-					data.table(
-						Covariate = paste(x),
-						level = ref.level,
-						n = n[1],
-						HR = 1,
-						lower.ci = NA,
-						upper.ci = NA,
-						log_SE = NA,
-						p = NA,
-						lower = ref.lower,
-						upper = ref.upper
+					# Make data.table
+					rbindlist(list(
+						data.table(
+							Covariate = paste(x),
+							level = ref.level,
+							n = n[1],
+							HR = 1,
+							lower.ci = NA,
+							upper.ci = NA,
+							log_SE = NA,
+							p = NA,
+							lower = ref.lower,
+							upper = ref.upper
+						),
+						dat
 					),
-					dat
-				),
-				use.names = T)
+					use.names = T)
 
-			}))
+				}))
 
-		if (!"gam" %in% class(tmp.coxph)) {
-			tmp.coef$events <- tmp.coxph$nevent
-		} else {
-			tmp.coef$events <- sum(tmp.coxph$y)
-		}
+			if (!"gam" %in% class(tmp.coxph)) {
+				tmp.coef$events <- tmp.coxph$nevent
+			} else {
+				tmp.coef$events <- sum(tmp.coxph$y)
+			}
 
-		tmp.coef$df <- NA
-		# Add back splined stuff ####
-		if (spline_year | spline_yin) {
-			tmp.coef <- rbindlist(list(
-				tmp.coef,
-				tmp.spline.coef[, .(
+			tmp.coef$df <- NA
+			# Add back splined stuff ####
+			if (spline_year | spline_yin) {
+				tmp.coef <- rbindlist(list(
+					tmp.coef,
+					tmp.spline.coef[, .(
 						Covariate = gsub("yin.gm", "year of hire", gsub(
 							"year", "calendar year",
 							paste0("P-spline of ", gsub("pspline\\(|, df.*$", "", Covariate)))),
@@ -1771,18 +1843,18 @@ get.coef <- function(
 						p,
 						events = tmp.coef$events[1],
 						df = {if ("gam" %in% class(tmp.coxph)) {
-									round(sapply(1:length(tmp.coxph$smooth), function(i) {tmp.coxph$smooth[[i]]$df}), 2)
-								} else {round(tmp.coxph$df[sapply(
-									Covariate,
-									match, gsub("`", "", full.covariates))],
-									2)}}
+							round(sapply(1:length(tmp.coxph$smooth), function(i) {tmp.coxph$smooth[[i]]$df}), 2)
+						} else {round(tmp.coxph$df[sapply(
+							Covariate,
+							match, gsub("`", "", full.covariates))],
+							2)}}
 					)]
-			), use.names = T, fill = T)
+				), use.names = T, fill = T)
 
-		}
+			}
 
 			# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		return(tmp.coef)
+			return(tmp.coef)
 		}) # End MI loop
 
 		# tmp.coef
@@ -1852,7 +1924,7 @@ get.coef <- function(
 				paste0(
 					ifelse(hwse2 | hwse3,
 								 paste0(ifelse(hwse2, "hwse 2", "hwse 3"),
-								 							ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
+								 			 ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
 								 			 "/Lag ", ifelse(!(hwse2 | hwse3), exposure.lag, 1) + additional.lag,
 								 			 ifelse(employment_status.lag != 0,
 								 			 			 paste0("/Employment status lagged ", employment_status.lag, " years"), "")),
@@ -1906,11 +1978,19 @@ get.coef <- function(
 					 coef.tab,
 					 envir = .GlobalEnv)
 
+		# Print to console ####
 		cat(paste0("\n", paste0(rep("_", 100), collapse = ""), "\n"))
 		cat(unlist(description))
 		cat("\n")
 		cat(paste0("Exposure lagged ", ifelse(!(hwse2 | hwse3), exposure.lag, 1) + additional.lag, " years\n"))
-		cat(paste0(tmp.coxph$nevent, " cases"))
+		# Time elapsed
+		since_start <- time_length(difftime(Sys.time(), start), "minutes")
+		if (mi > 0) {
+			if (since_start <= 90) {
+				cat(paste0(round(since_start, 2), " minutes since get.coef() was called."))
+			} else {
+				cat(paste0(round(since_start/60, 3), " hours since get.coef() was called."))
+			}}
 		cat(paste0("\n", paste0(rep("_", 100), collapse = ""), "\n"))
 		print(coef.tab[, -c("events")])
 	}))
@@ -1965,7 +2045,7 @@ get.ggtab <- function(mwf = "Straight",
 				ifelse(mi > 0, "mi race", ""),
 				sep = "/"
 			))
-			}
+		}
 
 		file.prefix <- paste0(
 			code,
