@@ -208,9 +208,6 @@ get.coxph <- function(
 					1994 + employment_status.lag, "-12-31")) |
 						year <= 1994 + employment_status.lag]
 			} else {
-				if (!(hwse2 | hwse3) & employment_status.lag > 0) {
-					message("Employment status lag ignored for ordinary cancer incidence models.")
-				}
 				dat <- dat[jobloss.date <= as.Date("1994-12-31") | year <= 1994 ]
 				dat[,`:=`(employment_status_lag = 0)]
 			}}
@@ -1440,7 +1437,7 @@ get.coef <- function(
 		outcomes <- 1
 	}
 
-	invisible(sapply(outcomes, function(i = outcomes[1]) {
+	invisible(sapply(outcomes, function(i = outcomes[2]) {
 
 		code <- unlist(incidence.key[i, 1])
 		description <- unlist(incidence.key[i, 2])
@@ -1498,7 +1495,7 @@ get.coef <- function(
 										 ifelse(hwse2, paste0(" and leaving work (", employment.which, ")"), "")))
 			pb <- txtProgressBar(min = 0, max = mi, style = 3)
 		}
-		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 31) {
+		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 1) {
 
 			if (is.null(mod.name)) {
 				mod.name <- paste0(
@@ -1606,11 +1603,9 @@ get.coef <- function(
 				Covariate = gsub("`", "", Covariate),
 				level,
 				HR = exp(as.numeric(Estimate)),
-				lower.ci = exp(as.numeric(Estimate) -
-											 	qnorm(0.975) * as.numeric(SE)),
-				upper.ci = exp(as.numeric(Estimate) +
-											 	qnorm(0.975) * as.numeric(SE)),
-				log_SE = as.numeric(SE),
+				lower.ci = exp(as.numeric(Estimate) - qnorm(1 - 0.05/2) * as.numeric(SE)),
+				upper.ci = exp(as.numeric(Estimate) + qnorm(1 - 0.05/2) * as.numeric(SE)),
+				SE = as.numeric(SE),
 				p = as.numeric(`p`),
 				lower = substr(level,
 											 unlist(gregexpr(
@@ -1813,7 +1808,7 @@ get.coef <- function(
 							HR = 1,
 							lower.ci = NA,
 							upper.ci = NA,
-							log_SE = NA,
+							SE = NA,
 							p = NA,
 							lower = ref.lower,
 							upper = ref.upper
@@ -1867,14 +1862,14 @@ get.coef <- function(
 				HR = mean(HR),
 				lower = unique(lower),
 				upper = unique(upper),
-				log_SE = sqrt(mean(log_SE^2) + (1 + 1/mi) * sum((log(HR) - mean(log(HR)))^2)/(mi - 1)),
+				SE = sqrt(mean(SE^2) + (1 + 1/mi) * sum((log(HR) - mean(log(HR)))^2)/(mi - 1)),
 				events = unique(events),
 				df = mean(df)
 			), by = .(Covariate, level)]
 			tmp.coef[,`:=`(
-				lower.ci = exp(log(HR) - log_SE * qnorm(1 - 0.05 / 2)),
-				upper.ci = exp(log(HR) + log_SE * qnorm(1 - 0.05 / 2)),
-				p = (1 - pnorm(abs(log(HR)), sd = log_SE)) * 2
+				lower.ci = exp(log(HR) - SE * qnorm(1 - 0.05 / 2)),
+				upper.ci = exp(log(HR) + SE * qnorm(1 - 0.05 / 2)),
+				p = (1 - pnorm(abs(log(HR)), sd = SE)) * 2
 			)]
 			tmp.coef <- tmp.coef[,names.og[,1], with = F]
 		}
@@ -1904,7 +1899,7 @@ get.coef <- function(
 				ci
 			},
 			p = as.character(formatC(round(p, 2), format = "f", digits = 2)),
-			`log(SE)` = as.character(formatC(round(log_SE, 3), format = "f", digits = 3)),
+			`SE` = as.character(formatC(round(SE, 3), format = "f", digits = 3)),
 			events,
 			df = as.character(formatC(round(df, 2), format = "f", digits = 2))
 		)]
@@ -2027,13 +2022,13 @@ clean.coef.tab <- function(x = as.data.frame(coef.tab),
 get.ggtab <- function(mwf = "Straight",
 											outcomes = outcomes.which,
 											time_scale = "age",
-											spline_year = T,
-											spline_yin = T,
+											spline_year = F,
+											spline_yin = F,
 											messy_sol = 0.05,
 											additional.lag = 0,
 											coef.directory = NULL,
 											mi = 0) {
-	lapply(outcomes, function(i = outcomes[1]) {
+	lapply(outcomes, function(i = outcomes[2]) {
 		# Exposure-incidence model
 		code <- unlist(incidence.key[i, 1]); description <- unlist(incidence.key[i, 2])
 
@@ -2054,7 +2049,7 @@ get.ggtab <- function(mwf = "Straight",
 			ifelse(spline_year,
 						 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
 						 ifelse(spline_yin, paste0("_splinedyin"), "")),
-			ifelse(mi > 0, paste0(".M", mi))
+			ifelse(mi > 0, paste0(".M", mi), "")
 		)
 
 		file.prefix <- gsub("^_", "", file.prefix)
@@ -2105,12 +2100,13 @@ get.ggtab <- function(mwf = "Straight",
 get.hwse.ggtab <- function(outcomes = outcomes.which,
 													 time_scale = "age",
 													 messy_sol = 0.05,
-													 spline_year = T,
-													 spline_yin = T,
+													 spline_year = F,
+													 spline_yin = F,
 													 additional.lag = 0,
 													 employment_status.lag = 0,
 													 coef.directory = NULL,
-													 mi = 0) {
+													 mi = 0,
+													 year.max = 1994) {
 	lapply(outcomes, function(
 		i = outcomes.which[1]
 	) {
@@ -2119,13 +2115,13 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 
 		if (is.null(coef.directory)) {
 			coef.directory <- paste0("./reports/resources/hwse 2",
+															 ifelse(is.finite(year.max), paste0("/FU through ", year.max), ""),
 															 paste0("/lag ", 1 + additional.lag),
 															 ifelse(employment_status.lag == 0, "",
 															 			 paste0("/Employment status lagged ",
 															 			 			 employment_status.lag, " years")),
 															 ifelse(!grepl("age", time_scale),
 															 			 "/indexed by calendar", "/indexed by age"),
-															 ifelse(mi > 0, "/mi race", ""),
 															 "/")
 		}
 
@@ -2137,6 +2133,10 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 			coef.directory <- paste0(coef.directory, dir.names)
 		}
 
+		if (mi > 0) {
+			coef.directory <- paste0(coef.directory, "/mi race")
+		}
+
 		coef.directory <- gsub("//", "/", coef.directory)
 
 		levels.new <- list(c("Still at work", "At any age"),
@@ -2146,7 +2146,7 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 											 2, 2,
 											 2)
 		coef.tab <- rbindlist(
-			lapply(1:length(dir.names), function(i) {
+			lapply(1:length(dir.names), function(i = 1) {
 				coef.tab <- readRDS(
 					paste0(here::here(
 						coef.directory[i],
@@ -2162,7 +2162,7 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 									 			 ifelse(spline_yin,
 									 			 			 paste0("_splinedyin"),
 									 			 			 "")),
-									 ifelse(mi > 0, ".M", mi),
+									 ifelse(mi > 0, paste0(".M", mi), ""),
 									 ".tab.rds"))))
 				names(coef.tab)[grepl("95", names(coef.tab))] <- "(95% CI)"
 				coef.tab <- clean.coef.tab(coef.tab[rows.which[[i]],])
@@ -2284,17 +2284,20 @@ get.facet_tikz <- function(
 	ggtab.prefix = c("str", "sol", "syn", "hwse"),
 	file.prefix = NULL,
 	directory = NULL,
-	messy_sol = 0.05) {
+	messy_sol = 0.05,
+	year.max = 1994) {
 
-	lapply(ggtab.prefix, function(prefix = "str") {
+	lapply(ggtab.prefix, function(prefix = "sol") {
 
 		i <- which(ggtab.prefix == prefix)
 
 		if (is.null(directory)) {
 			directory <- here::here(paste0("./reports/resources",
 																		 ifelse(grepl("hwse", prefix), "/hwse 2", ""),
+																		 ifelse(grepl("hwse", prefix) & year.max != 2015, paste0("/FU through ", year.max), ""),
 																		 "/Lag ", exposure.lag))
 		}
+
 
 		gg.tab <- as.data.table(as.data.frame(get(paste0("og_", prefix, ".ggtab"))))
 		gg.tab <- gg.tab[!grepl(" 50| 55", level)]
@@ -2316,7 +2319,7 @@ get.facet_tikz <- function(
 
 		tikz(file = paste(
 			directory,
-			paste0(ifelse(is.null(file.prefix[i]), prefix, file.prefix), paste0("_sol", messy_sol %/% .01), "_facet.tex"), sep = "/"),
+			paste0(ifelse(is.null(file.prefix[i]), paste0(prefix, paste0("_sol", messy_sol %/% .01)), file.prefix[i]), "_facet.tex"), sep = "/"),
 			standAlone = T, width = 11, height = 8.5)
 		print(ggplot(gg.tab, aes(
 			x = level.factor,
