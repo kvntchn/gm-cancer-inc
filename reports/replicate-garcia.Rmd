@@ -1,0 +1,289 @@
+---
+title: "HWSE path analysis"
+subtitle: "Replicating (?) the analysis in Garcia et al. (2017)"
+# author: "Kevin Chen"
+date: \today
+fontsize: 10pt
+output:
+  # pdf_document:
+  #   latex_engine: lualatex
+  #   includes:
+  #     in_header: "~/HeadRs/StatHead.sty"
+  #   number_sections: false
+  #   toc: false
+  # keep_tex: true
+  # word_document:
+  #   reference_docx: "~/HeadRs/style-guide.docx"
+  beamer_presentation:
+    toc: false
+    # latex_engine: lualatex
+    includes:
+      in_header: "~/HeadRs/BeamerHead.sty"
+bibliography: "`r path.expand('~/Box Sync/papers/EnvEpi.bib')`"
+csl: "`r path.expand('~/HeadRs/csl/ama.csl')`"
+---
+
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = F,
+											warning = F,
+											message = F,
+											cache = F,
+											fig.align = 'center',
+											fig.pos = 'H',
+											results = 'asis')
+
+source("~/headrs/00-my-theme.R")
+library(data.table)
+
+```
+
+# From Erika Garcia's paper[@Garcia_2017]
+
+<!-- \renewcommand{\arraystretch}{1.1} -->
+
+\begin{figure}[H]\begin{center}
+\fbox{
+\begin{tikzpicture}[>= stealth, auto,
+node distance = 2.5cm, semithick, scale=0.85,
+thick, fill=white, inner sep=5pt]
+\tikzstyle{every state}=[
+shape = rectangle, align = center, draw = none
+]
+\node[state] (employment) {Employment\\Status$_t$};
+\node[state] (E1) [below left of=employment, shift=({250:1cm})] {Exposure$_{t - 1}$};
+\node[state] (E) [below right of=employment]{Exposure$_{t}$};
+\node[state] (D) [right of=E1, node distance=7.5cm] {Disease};
+\node[state] (U) [above right of=E] {$U$};
+\path[->] (U) edge (employment);
+\path[->] (E1) edge (employment);
+\path[->] (U) edge (D);
+\path[->] (employment) edge (E);
+\path[->] (E1) edge (E);
+\path[->] (E) edge (D);
+\path[->] (E1) edge (D);
+\end{tikzpicture}
+}
+\end{center}
+\end{figure}
+
+The presence of the healthy worker survivor effect (HWSE) implies the presence of the following three conditions:
+
+1. Leaving work predicts (future) exposure
+2. Leaving work is associated with the disease
+3. Prior exposure predicts predicts leaving work
+
+# Analytic population
+
+- Restricted to
+  - Those alive and under age 75 on January 1, 1985
+  - Missing no more than half of their work history
+  - No discrepancy identified
+  - No job history pattern with 1977
+  - Record has reliable job history data (not an odd end)
+  - Eligible for cancer follow-up (2004, 2009, and 2015)
+- Leaving work and cancer incidence
+	- FU spans 1985--1994
+- MWF exposure and leaving work
+	- FU spans 3 years after hire throuh 1994, death, or leaving work
+
+# Characteristics
+
+```{r, eval=F}
+source("../gm-wrangling/wrangling/table1.R")
+hwse2.tab1 <- get.tab1(copy(cohort2), mathmode = F)
+cancer_male.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_first == 1 & (ddiag_first <= yoc | is.na(yoc)),studyno]]), mathmode = F)
+cancer_pr.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_pr == 1 & (ddiag_pr <= yoc | is.na(yoc)),studyno]]), mathmode = F)
+cancer_lu.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_lu == 1 & (ddiag_lu <= yoc | is.na(yoc)),studyno]]), mathmode = F)
+cancer_corec.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_corec == 1 & (ddiag_corec <= yoc | is.na(yoc)),studyno]]), mathmode = F)
+cancer_female.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_female[canc_first == 1 & (ddiag_first <= yoc | is.na(yoc)),studyno]]), mathmode = F)
+hwse3.tab1 <- get.tab1(copy(cohort2_big[year <= year(jobloss.date)]), mathmode = F)
+
+save(list = paste0(c("hwse2", "cancer_male", "cancer_pr", "cancer_lu", "cancer_corec", "cancer_female", "hwse3"), ".tab1"),
+     file = here::here("reports/replicate garcia 2017", "tab1.rdata"))
+```
+
+```{r}
+load(file = here::here("reports/replicate garcia 2017", "tab1.rdata"))
+clean_tab <- function(tab1 = hwse2.tab1, column_name) {
+  na.which <- is.na(tab1[,1])
+  tab1[!na.which, 2] <- paste0(
+    "(",
+    tab1[!na.which, 2],
+    ifelse(!is.na(tab1[!na.which, 3]), paste0(", ", tab1[!na.which, 3]), ""),
+    ")")
+
+  tab1 <- data.frame(tab1[,1:2])
+  
+  names(tab1) <- c(paste0("\\multicolumn{2}{c}{", column_name, "}\n%"), "\n")
+  
+  return(tab1)
+}
+```
+
+\footnotesize\centering
+```{r}
+cbind(clean_tab(hwse2.tab1, "Cancer follow-up"),
+      " " = NA,
+      clean_tab(hwse3.tab1, "Employment follow-up"))[
+        1:grep("Deceased", rownames(hwse2.tab1)),] %>% xtable(
+          align = "lrlcrl"
+        ) %>% print(
+          include.rownames = T
+        )
+```
+
+# Cancers in men
+
+\footnotesize\centering
+
+```{r}
+cbind(clean_tab(cancer_male.tab1, "All cancers"),
+      " " = NA,
+      clean_tab(cancer_pr.tab1, "Prostate"))[
+        c(1, 20:21, 2:5,18, 17, 24),] %>% xtable(
+          align = "p{0.35\\linewidth}rlcrl"
+        ) %>% print(include.rownames = T)
+```
+
+# Cancers in men
+
+\footnotesize\centering
+
+```{r}
+cbind(clean_tab(cancer_lu.tab1, "Lung"),
+      " " = NA,
+      clean_tab(cancer_corec.tab1, "Colorectal"))[
+        c(1, 20:21, 2:5,18, 17, 24),] %>% xtable(
+          align = "p{0.35\\linewidth}rlcrl"
+        ) %>% print(include.rownames = T)
+```
+
+# Cancers in women
+
+\footnotesize\centering
+
+```{r}
+clean_tab(cancer_female.tab1, "All cancers")[
+        c(1, 20:21, 2:5,18, 17, 24),] %>% xtable(
+          align = "lrl"
+        ) %>% print(include.rownames = T)
+```
+
+
+# 2. Leaving work and cancer incidence
+
+- Exposure: Employment status (binary)
+- Conditioning set:
+
+\begin{columns}
+\begin{column}{0.55\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Age\newline(index time for Cox model)
+\item Cumulative MWF exposure (lagged 1 year)
+\item Year of hire\newline(P-spline, $df = 3$)
+\item Calendar year\newline(P-spline, $df = 3$)
+\end{itemize}\end{itemize}
+\end{column}
+\begin{column}{0.45\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Duration of employment
+\item Race\newline(unknown as white)
+\item Plant
+\item Sex
+\end{itemize}\end{itemize}
+\end{column}
+\end{columns}
+
+- If cancer incidence date was the same as the date of leaving work, it was considered to have occurred after leaving work
+- If cancer incidence date was after date of death, it was assumed to have been on the day of death
+
+# 2. Leaving work by age 50 and cancer incidence
+
+$$\begin{aligned}
+\log h(t \mid a,\ x)
+& = \log h_0 (t) \\ & \hspace{2em}
++ a \cdot \Ind{t < 51} \cdot \beta_1
++ a \cdot \Ind{t \ge 51} \cdot \beta_2 \\ & \hspace{2em}
++ x \begin{pmatrix}\beta_3 & \cdots & \beta_p\end{pmatrix}^\top
+\end{aligned}$$
+
+where $a$ is the indicator of having left work, $t$ is age, and $x$ is a vector of covariates
+
+- Coefficients $\beta_1$ and $\beta_2$ may be thought of as interaction effects of employment status and age
+
+# 2. Leaving work and cancer incidence
+
+\centering\includegraphics[width=0.8\linewidth]{`r here::here("reports/resources/replicate garcia 2017/hwse 2/FU through 1994/Lag 1/indexed by age/", "hwse2.pdf")`}
+
+# 3. Prior exposure and leaving work
+
+- Exposure: Cumulative exposure lagged 1 year
+- Conditioning set:
+
+\begin{columns}
+\begin{column}{0.55\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Age\newline(index time for Cox model)
+\item Calendar year\newline(P-spline $df = 3$)
+\end{itemize}\end{itemize}
+\end{column}
+\begin{column}{0.45\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Race\newline(unknown as white)
+\item Plant
+\end{itemize}\end{itemize}
+\end{column}
+\end{columns}
+
+# 3. Prior exposure and leaving work (men)
+
+```{r}
+hwse3.dir <- here::here(paste0(
+		"./reports/resources/replicate garcia 2017",
+		paste0(paste0("/hwse 3",
+									paste0("/FU through 1994"),
+									"/Lag ", 1),
+					 "/indexed by age"
+		)))
+
+men_coef.tab <- readRDS(paste0(hwse3.dir, "/sol127_splinedyear.coef.rds"))
+women_coef.tab <- readRDS(paste0(hwse3.dir, "/female/sol10_splinedyear.coef.rds"))
+```
+
+\footnotesize\centering
+
+```{r}
+men_coef.tab[,.(
+  `\\multicolumn{2}{l}{MWF exposure}\n%` = c(
+    paste0("\\multicolumn{5}{l}{", gsub(" [0-9].*", "", Covariate[1]), "}\\\\\n"),
+    rep(NA, .N - 1)),
+  "\n" = level, n,
+  `Adjusted HR` = round(HR, 2),
+  `(95\\% CI)` = ifelse(is.na(lower.ci), "", paste0(
+    "(", round(lower.ci, 2), ", ", round(upper.ci, 2), ")"
+  ))
+), Covariate][grepl("Cumulative", Covariate),-1] %>% xtable
+
+```
+
+# 3. Prior exposure and leaving work (women)
+
+\footnotesize\centering
+
+```{r}
+women_coef.tab[,.(
+  `\\multicolumn{2}{l}{MWF exposure}\n%` = c(
+    paste0("\\multicolumn{5}{l}{", gsub(" [0-9].*", "", Covariate[1]), "}\\\\\n"),
+    rep(NA, .N - 1)),
+  "\n" = level, n,
+  `Adjusted HR` = round(HR, 2),
+  `(95\\% CI)` = ifelse(is.na(lower.ci), "", paste0(
+    "(", round(lower.ci, 2), ", ", round(upper.ci, 2), ")"
+  ))
+), Covariate][grepl("Cumulative", Covariate),-1] %>% xtable
+
+
+```
+
+# Citations

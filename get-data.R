@@ -22,7 +22,6 @@ if (!("get.cohort2" %in% ls())) {
 }
 
 year.max <- 2015
-employment_status.lag <- 0
 
 # Source 00-hello.R
 if (!('cohort' %in% ls(envir = .GlobalEnv))) {
@@ -41,66 +40,61 @@ if (!('cohort_analytic' %in% ls())) {
 	outcome.type <- 'incidence'
 	cohort_analytic <- get.cohort_analytic(
 		outcome_type = outcome.type,
-		exposure.lag = exposure.lag,
-		deathage.max = NULL,
+		exposure.lag = 1,
+		deathage.max = ifelse("deathage.max" %in% ls(envir = .GlobalEnv), deathage.max, NULL),
 		year.max = year.max,
 		hire.year.min = -Inf,
-		use_seer = T
+		hire.year.max = Inf,
+		use_seer = ifelse("use_seer" %in% ls(envir = .GlobalEnv), use_seer, T)
 	)
 	setorder(cohort_analytic, studyno, year)
 	cohort_analytic[, `:=`(yin.gm = date.to.gm(yin))]
 
 	# Keep only people who appear in the exposure data
-	cohort_analytic <- cohort_analytic[studyno %in% unique(exposure$studyno)]
+	if (!"restrict_by_exposure" %in% ls(envir = .GlobalEnv)) {
+		cohort_analytic <- cohort_analytic[studyno %in% unique(exposure$studyno)]
+	} else {
+		if (restrict_by_exposure) {
+			cohort_analytic <- cohort_analytic[studyno %in% unique(exposure$studyno)]
+		}
+	}
 
 	# PICK YOUT ####
 	cohort_analytic[, jobloss.date := get(yout.which)]
 
-	# Exposure after leaving work is 0
-	cohort_analytic[year > (year(jobloss.date) + exposure.lag), `:=`(
-		straight = 0,
-		soluble = 0,
-		synthetic = 0,
-		bio = 0,
-		cl = 0,
-		ea = 0,
-		tea = 0,
-		trz = 0,
-		s = 0,
-		no2 = 0)]
-	# NA fill
-	cohort_analytic[year <= (year(jobloss.date) + exposure.lag), `:=`(
-		straight = zoo::na.locf(straight),
-		soluble = zoo::na.locf(soluble),
-		synthetic = zoo::na.locf(synthetic),
-		bio = zoo::na.locf(bio),
-		cl = zoo::na.locf(cl),
-		ea = zoo::na.locf(ea),
-		tea = zoo::na.locf(tea),
-		trz = zoo::na.locf(trz),
-		s = zoo::na.locf(s),
-		no2 = zoo::na.locf(no2)
-	), by = .(studyno)]
-	table(cohort_analytic[,.(N = length(table(jobloss.date))), by = .(studyno)]$N)
-	cohort_analytic[, `:=`(
-		cum_straight = cumsum(straight),
-		cum_soluble = cumsum(soluble),
-		cum_synthetic = cumsum(synthetic),
-		cum_bio = cumsum(bio),
-		cum_cl = cumsum(cl),
-		cum_ea = cumsum(ea),
-		cum_tea = cumsum(tea),
-		cum_trz = cumsum(trz),
-		cum_s = cumsum(s),
-		cum_no2 = cumsum(no2)
-	), by = .(studyno)]
-
 	# Time off
-	cohort_analytic[,`:=`(
-		off = off.gan + off.san + off.han
-	)]
+	cohort_analytic[,`:=`(off = off.gan + off.san + off.han)]
 	cohort_analytic[is.na(off), off := 0]
 	cohort_analytic[, cum_off := cumsum(off), by = .(studyno)]
+
+	exposure.names <- c("straight", "soluble", "synthetic", "bio", "cl",
+											"ea", "tea", "trz", "s", "no2")
+
+	# Exposure after leaving work is 0
+	cohort_analytic[year > (year(jobloss.date) + 1), (exposure.names):=0]
+	# NA fill
+	cohort_analytic[year <= (year(jobloss.date) + 1), (exposure.names):=lapply(exposure.names, function (x) {
+		x <- get(x)
+		return(zoo::na.locf(x))
+	}), by = .(studyno)]
+
+	# table(cohort_analytic[,.(N = length(table(jobloss.date))), by = .(studyno)]$N)
+
+	if (get.cohort2 & !("cohort2" %in% ls())) {
+		cohort2 <- data.table::copy(cohort_analytic)
+	}
+
+	# Lag exposure appropriately
+	cohort_analytic[, (exposure.names):=lapply(exposure.names, function (x) {
+		x <- get(x)
+		return(shift(x, get("exposure.lag", envir = .GlobalEnv) - 1, 0))
+	}), by = .(studyno)]
+
+	cohort_analytic[, (paste0("cum_", exposure.names)):=lapply(
+		exposure.names, function(x) {
+			x <- get(x)
+			return(cumsum(x))
+		}), by = .(studyno)]
 
 	# Which columns ####
 	col.names <- names(cohort_analytic[, c(
@@ -124,12 +118,13 @@ if (!('cohort_analytic' %in% ls())) {
 		"yod",
 		"yoc",
 		"yob",
+		"yob.gm",
 		"sex",
 		"dateout.date",
 		"employment_end.date",
 		"employment_end.date.legacy",
 		"off", "cum_off",
-		"yout",
+		"yout", "yout95", "yout15", "yout16",
 		"yout_recode",
 		"jobloss.date",
 		"All causes",
@@ -137,53 +132,38 @@ if (!('cohort_analytic' %in% ls())) {
 		"All external causes",
 		"nohist", "wh", "immortal", "right.censored",
 		"possdiscr_new", "flag77", "oddend",
-		"status15", "cancinccoh15_new"), with = F])
+		"status15",
+		"cancinccoh", "cancinccoh15_new", "alive85"), with = F])
 
 	# Drop unnecessary data ####
 	cohort_analytic <- cohort_analytic[
-		wh == 1 & nohist == 0 &
+		# wh == 1 & nohist == 0,
 			# cancinccoh15_new == 1 &
-			possdiscr_new == 0,
-		# & immortal == 0 & right.censored == 0,
+			# possdiscr_new == 0,
+		# & immortal == 0 & right.censored == 0
+		,
 		col.names, with = F]
 }
 
 Sys.sleep(0)
 # Get cohort HWSE 2 ####
-if (get.cohort2 & !("cohort2" %in% ls())) {
+if (get.cohort2 | !("cohort2" %in% ls())) {
 
-		cohort2 <- as.data.table(as.data.frame(cohort_analytic))
-		setorder(cohort2, studyno, year)
-		cohort2.og <- as.data.table(as.data.frame(cohort2))
+	cohort2 <- cohort2[
+		# wh == 1 & nohist == 0,
+			# cancinccoh15_new == 1 &
+			# possdiscr_new == 0,
+		# & immortal == 0 & right.censored == 0
+		,
+		col.names, with = F]
 
-	if (exposure.lag + 1994 > 2015) {stop("Needlessly large exposure lag.")
-	} else {
-		cohort2[, `:=`(
-			straight = shift(straight, 1 - exposure.lag, fill = 0),
-			soluble = shift(soluble, 1 - exposure.lag, fill = 0),
-			synthetic = shift(synthetic, 1 - exposure.lag, fill = 0),
-			bio = shift(bio, 1 - exposure.lag, fill = 0),
-			cl = shift(cl, 1 - exposure.lag, fill = 0),
-			ea = shift(ea, 1 - exposure.lag, fill = 0),
-			tea = shift(tea, 1 - exposure.lag, fill = 0),
-			trz = shift(trz, 1 - exposure.lag, fill = 0),
-			s = shift(s, 1 - exposure.lag, fill = 0),
-			no2 = shift(no2, 1 - exposure.lag, fill = 0)),
-			by = .(studyno)]
-	}
+	cohort2[, (paste0("cum_", exposure.names)):=lapply(
+		exposure.names, function(x) {
+			x <- get(x)
+			return(cumsum(x))
+		}), by = .(studyno)]
 
-	cohort2[, `:=`(
-		cum_straight = cumsum(straight),
-		cum_soluble = cumsum(soluble),
-		cum_synthetic = cumsum(synthetic),
-		cum_bio = cumsum(bio),
-		cum_cl = cumsum(cl),
-		cum_ea = cumsum(ea),
-		cum_tea = cumsum(tea),
-		cum_trz = cumsum(trz),
-		cum_s = cumsum(s),
-		cum_no2 = cumsum(no2)
-	), by = .(studyno)]
+	cohort2.og <- data.table::copy(cohort2)
 
 	# # Censor those still at work in 1995
 	# cohort2 <- cohort2[year < 1995 | year(jobloss.date) < 1995]
@@ -192,7 +172,7 @@ if (get.cohort2 & !("cohort2" %in% ls())) {
 
 	# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	# Mortality cohort for positive/negative controls ####
-	mortality.cohort2 <- as.data.table(as.data.frame(cohort2))
+	mortality.cohort2 <- data.table::copy(cohort2)
 
 	# # Censor at 80
 	# mortality.cohort2[, `:=`(yoc = as.Date(apply(data.frame(

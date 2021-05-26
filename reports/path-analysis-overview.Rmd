@@ -1,0 +1,176 @@
+---
+title: "HWSE path analysis"
+subtitle: "Cancer incidence"
+# author: "Kevin Chen"
+date: \today
+fontsize: 10pt
+output:
+  # pdf_document:
+  #   latex_engine: lualatex
+  #   includes:
+  #     in_header: "~/HeadRs/StatHead.sty"
+  #   number_sections: false
+  #   toc: false
+  # keep_tex: true
+  # word_document:
+  #   reference_docx: "~/HeadRs/style-guide.docx"
+  beamer_presentation:
+    toc: false
+    # latex_engine: lualatex
+    includes:
+      in_header: "~/HeadRs/BeamerHead.sty"
+bibliography: "`r path.expand('~/Box Sync/papers/EnvEpi.bib')`"
+csl: "`r path.expand('~/HeadRs/csl/ama.csl')`"
+---
+
+
+# From Erika Garcia's paper[@Garcia_2017]
+
+<!-- \renewcommand{\arraystretch}{1.1} -->
+
+\begin{figure}[H]\begin{center}
+\fbox{
+\begin{tikzpicture}[>= stealth, auto,
+node distance = 2.5cm, semithick, scale=0.85,
+thick, fill=white, inner sep=5pt]
+\tikzstyle{every state}=[
+shape = rectangle, align = center, draw = none
+]
+\node[state] (employment) {Employment\\Status$_t$};
+\node[state] (E1) [below left of=employment, shift=({250:1cm})] {Exposure$_{t - 1}$};
+\node[state] (E) [below right of=employment]{Exposure$_{t}$};
+\node[state] (D) [right of=E1, node distance=7.5cm] {Disease};
+\node[state] (U) [above right of=E] {$U$};
+\path[->] (U) edge (employment);
+\path[->] (E1) edge (employment);
+\path[->] (U) edge (D);
+\path[->] (employment) edge (E);
+\path[->] (E1) edge (E);
+\path[->] (E) edge (D);
+\path[->] (E1) edge (D);
+\end{tikzpicture}
+}
+\end{center}
+\end{figure}
+
+The presence of the healthy worker survivor effect (HWSE) implies the presence of the following three conditions:
+
+1. Leaving work predicts (future) exposure
+2. Leaving work is associated with the disease
+3. Prior exposure predicts predicts leaving work
+
+# Analytic population
+
+- Cancer incidence follow-up
+	- Starting in 1973 in plants 1 and 2; 1985 in plant 3
+	- Ending in 2015
+- Employment records in in 1994; individuals still at work in 1995 were censored
+
+# 2. Leaving work and cancer incidence
+
+\begin{figure}[H]\begin{center}
+\fbox{
+\begin{tikzpicture}[>= stealth, auto,
+node distance = 2.5cm, semithick, scale=0.85,
+thick, fill=white, inner sep=5pt]
+\tikzstyle{every state}=[
+shape = rectangle, align = center, draw = none
+]
+\node[state] (employment) {Employment\\Status$_t$};
+\node[state] (E1) [below left of=employment, shift=({250:1cm}),draw=black] {Cumulative\\Exposure$_{t - 1}$};
+\node[state] (E) [below right of=employment]{Cumulative\\Exposure$_{t}$};
+\node[state] (D) [right of=E1, node distance=7.5cm] {Disease};
+\node[state] (U) [above right of=E] {$U$};
+\path[->] (U) edge (employment);
+%\path[->] (E1) edge (employment);
+\path[->] (U) edge (D);
+\path[->] (employment) edge (E);
+%\path[->] (E1) edge (E);
+\path[->] (E) edge (D);
+%\path[->] (E1) edge (D);
+\end{tikzpicture}
+}
+\end{center}
+\end{figure}
+
+- Exposure: Employment status (binary)
+- Conditioning set:
+
+\begin{columns}
+\begin{column}{0.55\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Age (index time for Cox model)
+\item Cumulative MWF exposure (lagged 1 year)
+\item Year of hire
+\end{itemize}\end{itemize}
+\end{column}
+\begin{column}{0.45\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Race (MI)
+\item Plant
+\item Sex
+\end{itemize}\end{itemize}
+\end{column}
+\end{columns}
+
+# 2. Leaving work at age 60 and cancer incidence
+
+$$\begin{aligned}
+\log h(t \mid a,\ x)
+& = \log h_0 (t) \\ & \hspace{2em}
++ a \cdot \Ind{t < 60} \cdot \beta_1
++ a \cdot \Ind{t \ge 60} \cdot \beta_2 \\ & \hspace{2em}
++ x \begin{pmatrix}\beta_3 & \cdots & \beta_p\end{pmatrix}^\top
+\end{aligned}$$
+
+where $a$ is the indicator of having left work, $t$ is age, and $x$ is a vector of covariates
+
+- Coefficients $\beta_1$ and $\beta_2$ may be thought of as interaction effects of employment status and age
+
+# 3. Prior exposure and leaving work
+
+\begin{figure}[H]\begin{center}
+\fbox{
+\begin{tikzpicture}[>= stealth, auto,
+node distance = 2.5cm, semithick, scale=0.85,
+thick, fill=white, inner sep=5pt]
+\tikzstyle{every state}=[
+shape = rectangle, align = center, draw = none
+]
+\node[state] (employment) {Employment\\Status$_t$};
+\node[state] (E1) [below left of=employment, shift=({250:1cm})] {Exposure$_{t - 1}$};
+\node[state] (E) [below right of=employment]{};
+\node[state] (D) [right of=E1, node distance=7.5cm] {};
+\node[state] (U) [above right of=E] {};
+%\path[->] (U) edge (employment);
+\path[->] (E1) edge (employment);
+%\path[->] (U) edge (D);
+%\path[->] (employment) edge (E);
+%\path[->] (E1) edge (E);
+%\path[->] (E) edge (D);
+%\path[->] (E1) edge (D);
+\end{tikzpicture}
+}
+\end{center}
+\end{figure}
+
+- Exposure: Cumulative exposure lagged 1 year
+- Conditioning set:
+
+\begin{columns}
+\begin{column}{0.55\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Age (index time for Cox model)
+\item Year of hire
+\item Race (MI)
+\end{itemize}\end{itemize}
+\end{column}
+\begin{column}{0.45\linewidth}
+\begin{itemize}\item[]\begin{itemize}
+\item Plant
+\item Sex
+\end{itemize}\end{itemize}
+\end{column}
+\end{columns}
+
+# Citations

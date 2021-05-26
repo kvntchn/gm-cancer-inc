@@ -103,6 +103,7 @@ cancers.which <- grep("colon|^rectal|pancreatic|esophageal|stomach|laryn|lung|br
 
 ```{r, eval=F}
 if (!('cohort_analytic' %in% ls())) {
+	source(here::here("get-data.R"))
 	source(here::here('incidence.R'))
 }
 
@@ -110,8 +111,13 @@ if (!('cohort_analytic' %in% ls())) {
 
 ```{r get.tab1, eval=F}
 source(here::here('../gm-wrangling/wrangling', 'table1.R'))
+tab1_cohort <- copy(cohort_analytic[(year >= 1985 | (year >= 1973 & plant %in% 1:2)) & immortal == 0 & right.censored == 0])
+tab1_cohort[(ddiag_first < as.Date("1973-01-01") | (
+	ddiag_first < as.Date("1985-01-01") & plant == 3)),`:=`(ddiag_first = NA)]
+tab1_cohort[ddiag_first < yin + years(3),`:=`(ddiag_first = NA)]
+
 tab1 <- get.tab1(
-	df = as.data.table(as.data.frame(cohort_analytic[(year >= 1985 | (year >= 1973 & plant %in% 1:2)) & immortal == 0 & right.censored == 0])),
+	df = copy(tab1_cohort),
 	exposure_lag = exposure.lag,
 	use_finrace = T,
 	incidence = T)
