@@ -38,7 +38,7 @@ outcomes.which <- grep("prostate|lung|colorectal|All cancers", incidence.key$des
 incidence.key[outcomes.which,]
 
 yout.which <- "yout"
-use_seer <- F
+use_seer <- T
 race.imputed.melt <- NULL
 employment_status.lag <- c(0)
 additional.lag <- c(0)
@@ -83,37 +83,43 @@ restrict_by_exposure <- T
 # #  parent folder name :  data
 # #  parent folder id   :  118903632077
 
-# Download data
+# Load data ####
 # box_auth()
-cohort2_big <- box_read(811171083241)
+cohort2.og <- box_read(811171083241)
 # n_distinct(cohort[studyno %in% exposure$studyno])
 # n_distinct(cohort2.og$studyno)
-# cohort2_big <- copy(cohort2.og)
+cohort2_big <- copy(cohort2.og)
 
+# Choose leaving work variable
 cohort2_big[, jobloss.date := gm.to.date(yout15[1]), studyno]
+
+# Tweak yout
+new_yout <- cohort[yrout09_new < yout15, .(
+	id = studyno,
+	jobloss.date = gm.to.date(yrout09_new)
+)]
+
+cohort2_big[studyno %in% new_yout$studyno,
+						jobloss.date := new_yout[id == studyno]$jobloss.date,
+						studyno]
 
 cohort2_big[,yoc := min(yoc[1], yob[1] + years(75), na.rm = T), studyno]
 cohort2_big <- cohort2_big[year <= year(yoc) | is.na(yoc)]
 
 cohort2_big <- cohort2_big[
-	time_length(difftime(jobloss.date, yin), "year") > 3 &
 		studyno %in% cohort[
-			cancinccoh == 1 & cancinccoh09 == 1 &
-				cancinccoh_new == 1 & cancinccoh09_new == 1 &
-				cancinccoh15 & cancinccoh15_new == 1 & possdiscr == 0,
-			studyno] &
+			cancinccoh09 == 1 & cancinccoh09_new == 1,  studyno] &
 		yin.gm >= 1938 &
 		yin.gm <= 1985 &
-		flag77 == 0 &
-		possdiscr_new == 0 &
-		oddend == 0 &
+		# flag77 == 0 &
+		# possdiscr_new == 0 &
+		# oddend == 0 &
 		nohist == 0 &
 		wh == 1 &
 		year < 1995 &
 		# finrace %in% c(1, 2) &
-		yob.gm > 1910 &
-		(yod >= as.Date("1985-01-01") | is.na(yod)) &
-		year <- year(jobloss.date)
+		yob.gm >= 1910 &
+		(yod >= as.Date("1985-01-01") | is.na(yod))
 ]
 
 n_distinct(cohort2_big$studyno)
@@ -150,6 +156,8 @@ get.hwse2.coxph(
 	outcomes = outcomes.which,
 	cohort_name = "cohort2_male",
 	run_model = T,
+	lazy_indexing = T,
+	linear_duration = F,
 	spline_year = T,
 	year.df = 3,
 	spline_yin = T,
@@ -178,6 +186,7 @@ for (x in c("Binary", paste("Age", seq(50, 60, 5)))) {
 		# messy_sol = NA,
 		time_scale = "age",
 		employment.which = x,
+		linear_duration = F,
 		spline_year = T,
 		spline_yin = T,
 		hwse2 = T,
@@ -211,6 +220,8 @@ get.hwse2.coxph(
 	outcomes = outcomes.which[length(outcomes.which)],
 	cohort_name = "cohort2_female",
 	run_model = T,
+	lazy_indexing = T,
+	linear_duration = F,
 	spline_year = T,
 	year.df = 3,
 	spline_yin = T,
@@ -241,6 +252,7 @@ for (x in c("Binary", paste("Age", seq(50, 60, 5)))) {
 		# messy_sol = NA,
 		time_scale = "age",
 		employment.which = x,
+		linear_duration = F,
 		spline_year = T,
 		spline_yin = T,
 		hwse2 = T,

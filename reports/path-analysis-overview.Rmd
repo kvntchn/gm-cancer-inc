@@ -173,4 +173,39 @@ shape = rectangle, align = center, draw = none
 \end{column}
 \end{columns}
 
+# Can conventional methods be used for the path analysis?
+
+
+\begin{figure}[H]\begin{center}
+\begin{tikzpicture}[>= stealth, auto,
+node distance = 2.2cm, semithick, scale=0.8,
+thick, fill=white, inner sep=5pt]
+\tikzstyle{every state}=[
+shape = rectangle, align = center, draw = none
+]
+\node[state] (employment1) {Employment\\Status$_{t - 1}$};
+\node[state] (employment) [right of=employment1, node distance=3cm] {Employment\\Status$_t$};
+\node[state] (E1) [below left of=employment, shift=({250:1cm})] {MWF$_{t - 1}$};
+\node[state] (E) [below right of=employment]{MWF$_{t}$};
+\node[state] (E2) [left of=E, node distance=6cm] {MWF$_{t - 2}$};
+\node[state] (D) [right of=E1, node distance=6.5cm] {Disease};
+\node[state] (U) [above right of=E] {$U$};
+\path[->] (E2) edge (employment1);
+\path[->] (E2) edge (E1);
+\path[->] (E2) edge (E1);
+\path[->] (E2) edge [bend right=55] (D);
+\path[->] (employment1) edge (employment);
+\path[->] (employment1) edge (E1);
+\path[->] (U) edge (employment);
+\path[->] (E1) edge (employment);
+\path[->] (U) edge (D);
+\path[->] (employment) edge (E);
+\path[->] (E1) edge (E);
+\path[->] (E) edge (D);
+\path[->] (E1) edge (D);
+\end{tikzpicture}
+\end{center}
+\end{figure}
+
+
 # Citations

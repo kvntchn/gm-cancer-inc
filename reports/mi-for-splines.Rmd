@@ -1,0 +1,307 @@
+---
+title: "Splines with Multiple Imputation"
+author: "Kevin Chen"
+bibliography: "`r path.expand('~/Box Sync/papers/EnvEpi.bib')`"
+---
+
+```{r setup, include=F}
+# Code chunk options
+knitr::opts_chunk$set(
+	echo = T,
+	warning = F,
+	message = F,
+	cache = F,
+	fig.align = 'center',
+	fig.pos = 'H',
+	results = 'asis')
+
+# Packages to load or install, if needed
+packages <- c("here", "knitr", "tidyverse", "data.table", "lubridate", "Hmisc", "survival", "boxr")
+
+# Load or install packages
+invisible(sapply(packages, function(package) {
+	if (package %in% rownames(installed.packages())) {
+		library(package, character.only = T)
+	} else {
+		install.packages(package)
+		library(package, character.only = T)
+	}
+}))
+
+# Authenticate to get data from Box
+box_auth()
+
+```
+
+## Quick review of multiple imputation
+
+Here, we briefly review some material presented by @Murray_2018. Let $Y_i$ be some variable corresponding to the $i$th unit. For some units, the value of this variable is missing. When we know the mechanism by which $Y_i$ is missing, we may use multiple imputation (MI) to estimate the value of some (scalar) estimand $Q$, possibly a function of $Y$. Let $\hat Q(Y)$ be an estimator of $Q$. The sampling variance of estimator $\hat Q$ is $U$, which we estimate using $\hat U(Y)$. Let $M$ be the number of times we impute.
+
+Suppose we have $M$ imputed sets $Y^{(1)}, Y^{(2)}, \ldots, Y^{(M)}$. Define $\hat Q^{(m)}$ to be the estimator computed using the $m$th imputed set $Y^{(m)}$, with $\hat U^{(m)}$ defined similarly. The pivotal statistics for estimation and inference under MI are:
+
+$$\begin{aligned}
+\bar Q_{M} & = \sum^M_{m = 1} \frac{\hat Q^{(m)}}{M} \\
+\bar U_{M} & = \sum^M_{m = 1} \frac{\hat U^{(m)}}{M} \\
+B_{M} & = \sum^M_{m = 1} \frac{\left(\hat Q^{(m)} - \bar Q_{M}\right)^2}{M - 1}
+\end{aligned}$$
+
+The MI point estimate is $\bar Q_M$. The variance estimator of $\bar Q_M$ is
+
+$$T_M = \bar U_{M} + \left(1 + \frac{1}{M}\right)\ B_M$$
+
+## Cox proportional hazards model for stomach cancer and metalworking fluid exposure
+
+The code chunk below loads the raw GM data as well as helper functions for building the analytic data and doing analyses. By default, it is set not to run when compiling this document; the code is provided for your reference. Instead, we will simply load the relevant data in the next chunk. When invoking the `get.coxph()` function, set `mi = 5` in order to get $M = 5$ sets of imputed race data.
+
+```{r, eval=F}
+# Get data and helper functions for building analytic data
+source(here::here("get-data.R"))
+source(here("incidence.R"))
+
+# Build analytic data for Cox PH analysis for NHL
+get.coxph(
+	outcomes = grep("hodgkin", incidence.key$description, ignore.case = T),
+	run_model = F,
+	mi = 5)
+
+# Save analytic data to Box
+box_save(
+	nhl.dat,
+	file_name = "nhl.dat.rdata",
+	dir_id = 139229852587)
+
+# Save race imputations to Box
+box_write(
+	nhl.mi_race.M5,
+	"nhl.mi_race.M5.rds",
+	139229852587)
+```
+
+```{r, results="hide"}
+# Get analytic data from Box
+box_load(822272704950)
+
+# Get race imputations from Box
+nhl.mi_race.M5 <- box_read(822295137787)
+```
+
+Before doing the MI, consider the code for running a Cox model with splined exposure to straight MWF where those of missing race are considered to be a separate category of race. This can be done using the standard functions from the `survival` package. Running these models with splines takes a bit of time, especially when setting `df = 0`, which means the degrees of freedom are chosen by cAIC [@Hurvich_1991].
+
+```{r, eval=F}
+# Set those of missing race to be their own separate category
+nhl.dat[finrace %in% c(0, 9), Race := "Unknown"]
+
+# Run Cox PH model
+nhl.coxph <- coxph(
+	Surv(age.year1, age.year2, status) ~
+		pspline(cum_straight, df = 0) +
+		`Cumulative soluble 5` +
+		`Cumulative synthetic` +
+		Year +
+		`Year of hire` + 
+		Race + Plant + Sex,
+	data = nhl.dat[immortal != 1 & right.censored != 1],
+	method = "efron")
+
+# Save output to Box
+box_write(
+	nhl.coxph,
+	"nhl.coxph.rds",
+	139229852587)
+```
+
+Using the model output, we can plot the spline in the way suggested by @Therneau_2021. The `termplot()` function is a built-in function in `R` which plots regression terms against their predictors. The function outputs the predicted value and associated standard error over a fine grid of values given by the domain of the predictor.
+
+```{r, results="markup"}
+# Get Cox model result from Box
+nhl.coxph <- box_read(822616524220)
+
+# Check the terms in the model
+attr(terms(nhl.coxph), "term.labels")
+
+# Use the built-in function to plot the spline
+termplot(nhl.coxph,
+				 # We use term = 1 because the first term in
+				 # the model is for splined straight exposure
+				 term = 1,
+				 se = T, col.term = 1, col.se = 1)
+```
+
+We can do better by extracting the values from the output of `termplot()`, subtracting the partial effect of 0 straight exposure, and exponentiating to get adjusted hazard ratios.
+
+```{r, fig.height=3*1.5, fig.width=4*1.5, fig.cap="Adjusted hazard ratio of NHL associated with cumulative exposure to straights. Missing race treated as separate category."}
+# Save data used to generate the plot above
+nhl.termplot <- termplot(nhl.coxph, term = 1, se = T, plot = F)
+
+# Extract the relevant quantities
+nhl.ggtab <- data.frame(
+				exposure = nhl.termplot[["cum_straight"]]$x,
+				`Point estimate` = nhl.termplot[["cum_straight"]]$y,
+				se = nhl.termplot[["cum_straight"]]$se,
+				Reference = mean(with(nhl.termplot[["cum_straight"]],
+												y[signif(x, 2) == 0])),
+				df = nhl.coxph$df[1],
+				check.names = F
+			)
+setDT(nhl.ggtab)
+setorder(nhl.ggtab, exposure)
+
+# Subtract the hazard at the reference level of exposure
+nhl.ggtab[,`:=`(
+	`Point estimate` = `Point estimate` - Reference
+)]
+
+# Set the level of exposure at which we truncate the graph
+mwf_max <- quantile(nhl.dat$cum_straight, 1)
+
+# Thin out grid, if desired
+nhl.ggtab <- nhl.ggtab[seq(
+	1, .N,
+	length.out = (max(exposure) - min(exposure)) * 50)]
+
+# Plot spline
+nhl.ggtab[exposure > 0 & exposure <= mwf_max] %>% ggplot(
+	aes(x = exposure, y = exp(`Point estimate`))) +
+	stat_function(fun = function(x) {1}, geom = 'line',
+								color = 'grey') +
+	geom_ribbon(aes(
+		ymin = exp(`Point estimate` - qnorm(0.975) * se),
+		ymax = exp(`Point estimate` + qnorm(0.975) * se)),
+		alpha = 0.1) +
+	geom_line() +
+	geom_label(aes(
+		x = ifelse(nchar(signif(nhl.ggtab$df[1], 3)) > 1,
+							 0.04, 0.02) * (mwf_max),
+		y = 4.45,
+		label = paste0("df = ", signif(nhl.ggtab$df[1], 3))),
+		size = 4) +
+	coord_cartesian(xlim = c(0, mwf_max),
+									ylim = c(0.5, 4.5)) +
+	labs(
+		x = bquote('Cumulative exposure to straights (mg/m' ^3 %.% 'years)'),
+		y = "HR of NHL") + 
+	theme_bw()
+
+```
+
+## Now with multiple imputation
+
+To get the MI spline estimate, we simply repeat the analysis above $M = 5$ times, where in each iteration, we use a different imputed set for race. The code below is nearly identical to that above, except many of the actions are wrapped inside a `lapply()` function.
+
+```{r, eval=F}
+nhl_mi.coxph <- lapply(1:5, function(i = 1) {
+	
+	# Get imputed race
+	dat <- merge(nhl.dat, nhl.mi_race.M5[[i]],
+							 by = c("studyno", "year"),
+							 all.x = T, all.y = F)
+	dat[finrace %in% c(0, 9), Race := Race.impute]
+	dat[,Race := factor(Race, levels = c("White", "Black"))]
+	
+	# Run Cox PH model
+	nhl.coxph <- coxph(
+	Surv(age.year1, age.year2, status) ~
+		pspline(cum_straight, df = 3.58) +
+		`Cumulative soluble 5` +
+		`Cumulative synthetic` +
+		Year +
+		`Year of hire` + 
+		Race + Plant + Sex,
+	data = dat[immortal != 1 & right.censored != 1],
+	method = "efron")
+	
+	return(nhl.coxph)
+	
+})
+
+# Save output to Box
+box_save(nhl_mi.coxph,
+				 file_name = paste0("nhl_mi.coxph.rdata"),
+				 dir_id = 139229852587)
+```
+
+```{r, results="hide"}
+# Load spline model output from Box
+box_load(822857562054)
+
+nhl_mi.ggtab <- lapply(1:5, function(i) {
+	# Save data used to generate the spline plots
+	nhl.termplot <- termplot(nhl_mi.coxph[[i]], term = 1, se = T, plot = F)
+	
+	# Extract relevant quantities
+	nhl.ggtab <- data.frame(
+		exposure = nhl.termplot[["cum_straight"]]$x,
+		`Point estimate` = nhl.termplot[["cum_straight"]]$y,
+		se = nhl.termplot[["cum_straight"]]$se,
+		Reference = mean(with(nhl.termplot[["cum_straight"]],
+										y[signif(x, 2) == 0])),
+		df = nhl_mi.coxph[[i]]$df[1],
+		check.names = F
+	)
+	setDT(nhl.ggtab)
+	setorder(nhl.ggtab, exposure)
+	
+	# Contrast to reference
+	nhl.ggtab[,`:=`(
+		`Point estimate` = `Point estimate` - Reference
+	)]
+	
+	return(nhl.ggtab)
+})
+```
+
+Now that we have a list of $M = 5$ sets of spline point estimates and standard errors, we combine them according to the formulas summarized above. The MI point estimate is simply the mean across the $M = 5$ point estimates. The variance estimate for the MI point estimate is a linear combination of the mean variance across the $M = 5$ variances and the excess variance. This must be done for every point over the fine grid of values given by the domain of the predictor.
+
+```{r, fig.height=(2.5 * 2 + 0.5) * 1.5, fig.width=4 * 1.5, fig.cap="Adjusted hazard ratio of NHL associated with cumulative exposure to straights."}
+# Get pooled estimates
+nhl_mi.ggtab <- rbindlist(nhl_mi.ggtab)[, .(
+	`Point estimate` = mean(`Point estimate`),
+	se.pooled = sqrt(mean(se^2)),
+	var.excess = sum((`Point estimate` - mean(`Point estimate`))^2/(
+		length(nhl_mi.ggtab) - 1)),
+	df = unique(df)
+), by = .(exposure)]
+
+# Calculate the standard error of the MI estimate
+nhl_mi.ggtab[, `:=`(
+	se = sqrt(se.pooled^2 + (1 + 1/length(nhl_mi.ggtab)) * var.excess),
+	df = mean(df))]
+
+# Thin out grid, if desired
+nhl_mi.ggtab <- nhl_mi.ggtab[seq(
+	1, .N,
+	length.out = (max(exposure) - min(exposure)) * 50)]
+
+# Plot splines
+rbindlist(list(
+	"Missing race handled by multiple imputation" = nhl_mi.ggtab[exposure > 0 & exposure <= mwf_max],
+	"Missing race treated as separate category" = nhl.ggtab[exposure > 0 & exposure <= mwf_max]
+	), idcol = "Method for missing race", fill = T) %>% ggplot(
+	aes(x = exposure, y = exp(`Point estimate`))) +
+	stat_function(fun = function(x) {1}, geom = 'line',
+								color = 'grey') +
+	geom_ribbon(aes(
+		ymin = exp(`Point estimate` - qnorm(0.975) * se),
+		ymax = exp(`Point estimate` + qnorm(0.975) * se)),
+		alpha = 0.1) +
+	geom_line() +
+	geom_label(aes(
+		x = ifelse(
+			nchar(signif(df, 3)) > 1,
+			0.04, 0.02) * (mwf_max),
+		y = 4.45,
+		label = paste0("df = ", signif(df, 3))),
+		size = 4) +
+	coord_cartesian(xlim = c(0, mwf_max),
+									ylim = c(0.5, 4.5)) +
+	facet_wrap(. ~ `Method for missing race`, ncol = 1) +
+	labs(
+		x = bquote('Cumulative exposure to straights (mg/m' ^3 %.% 'years)'),
+		y = "HR of NHL") + 
+	theme_bw()
+```
+
+
+___
+
+## Citations

@@ -21,6 +21,11 @@ if (!("get.cohort2" %in% ls())) {
 	# rm(cohort_analytic)
 }
 
+if (!("yout.which" %in% ls())) {
+	yout.which <- "yout"
+	# rm(cohort_analytic)
+}
+
 year.max <- 2015
 
 # Source 00-hello.R
@@ -41,7 +46,7 @@ if (!('cohort_analytic' %in% ls())) {
 	cohort_analytic <- get.cohort_analytic(
 		outcome_type = outcome.type,
 		exposure.lag = 1,
-		deathage.max = ifelse("deathage.max" %in% ls(envir = .GlobalEnv), deathage.max, NULL),
+		deathage.max = if ("deathage.max" %in% ls(envir = .GlobalEnv)) {deathage.max} else {NULL},
 		year.max = year.max,
 		hire.year.min = -Inf,
 		hire.year.max = Inf,
@@ -137,9 +142,9 @@ if (!('cohort_analytic' %in% ls())) {
 
 	# Drop unnecessary data ####
 	cohort_analytic <- cohort_analytic[
-		# wh == 1 & nohist == 0,
+		wh == 1 & nohist == 0,
 			# cancinccoh15_new == 1 &
-			# possdiscr_new == 0,
+			possdiscr_new == 0,
 		# & immortal == 0 & right.censored == 0
 		,
 		col.names, with = F]
@@ -150,9 +155,9 @@ Sys.sleep(0)
 if (get.cohort2 | !("cohort2" %in% ls())) {
 
 	cohort2 <- cohort2[
-		# wh == 1 & nohist == 0,
+		wh == 1 & nohist == 0,
 			# cancinccoh15_new == 1 &
-			# possdiscr_new == 0,
+			possdiscr_new == 0,
 		# & immortal == 0 & right.censored == 0
 		,
 		col.names, with = F]

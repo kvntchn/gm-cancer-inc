@@ -55,21 +55,22 @@ In addition, path analyses for evidence of the healthy worker survivor effect ar
 
 The study population, summarized in Table \ref{tab:tab1}, included subjects from the UAW-GM Cohort who were still alive at the start of cancer incidence follow-up. Cancer incidence data were abstracted from Michigan Cancer Registry for all plants from years 1985 onward. Cancer incidence data for plants 1 and 2 were supplemented with data from the Surveillance, Epidemiology, and End Results Program (SEER).
 
-In all analyses, follow-up began three years after hire and no earlier than 1973 for plants 1 and 2 or 1985 for plant 3; follow-up ended upon experiencing the outcome of interest, attaining the oldest observed age at death (considered lost to follow-up), dying, or reaching the year 2015, whichever came first. In path analyses involving employment status, subjects were censored on December 31, 1994 (end of employment records) if they did not leave work before then. Missing race was handled by multiple imputation ($M = 50$).[@Murray_2018]
+In all analyses, follow-up began three years after hire and no earlier than 1973 for plants 1 and 2 or 1985 for plant 3; follow-up ended upon experiencing the outcome of interest, attaining the oldest observed age at death (considered lost to follow-up), dying, or reaching the year 2015, whichever came first. In path analyses involving employment status, follow-up ended on December 31, 1994 (end of employment records). Missing race was treated as a separate category.
 
 
 ```{r, echo=F}
 exposure.lag <- 21
-employment_status.lag <- 0
+employment_status.lag <- 1
 hwse3.additional.lag <- 0
 hwse2.additional.lag <- 0
-spline_yin <- F
-spline_year <- F
+spline_yin <- T
+spline_year <- T
 time_scale <- "age"
 hwse2.time_scale <- "age"
 table.engine <- "xtable"
 messy_sol <- 0.05
-
+mi <- 0
+hwse_age_under <- 75
 ```
 
 <!-- \fancyhead[R]{Exposure lagged `r exposure.lag` years} -->
@@ -123,7 +124,7 @@ tab1 <- get.tab1(
 	incidence = T)
 
 saveRDS(tab1,
-				here::here("./reports/resources/",
+				here::here("reports/resources/",
 									 paste0("tab1", "_lag", exposure.lag, '.rds')))
 ```
 
@@ -260,43 +261,41 @@ clean.coef.tab <- function(x,
 \caption{Adjusted hazard ratios associated with exposure to straight metal working fluids in the \textbf{UAW-GM Cohort}.}
 \label{fig:str}
 \centering
-\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("str", ifelse(is.finite(messy_sol),
-						 paste0("_sol", messy_sol %/% .01), ""), ".M50_facet.pdf"))`"}
+\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("str", ifelse(is.finite(messy_sol), paste0("_sol", messy_sol %/% .01), ""), ifelse(mi > 0, paste0(".M", mi), ""), "_facet.pdf"))`"}
 \end{figure}
 
 \begin{figure}[H]
 \caption{Adjusted hazard ratios associated with exposure to soluble metal working fluids in the \textbf{UAW-GM Cohort}.}
 \label{fig:sol}
 \centering
-\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("sol", ifelse(is.finite(messy_sol),
-						 paste0("_sol", messy_sol %/% .01), ""), ".M50_facet.pdf"))`"}
+\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag), paste0("sol", ifelse(is.finite(messy_sol), paste0("_sol", messy_sol %/% .01), ""), ifelse(mi > 0, paste0(".M", mi), ""), "_facet.pdf"))`"}
 \end{figure}
 
 \begin{figure}[H]
 \caption{Adjusted hazard ratios associated with exposure to synthetic metal working fluids in the \textbf{UAW-GM Cohort}.}
 \label{fig:syn}
 \centering
-\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag),  paste0("syn", ifelse(is.finite(messy_sol),
-						 paste0("_sol", messy_sol %/% .01), ""), ".M50_facet.pdf"))`"}
+\includegraphics[width=7.95in]{"`r here::here(paste0("reports/resources/Lag ", exposure.lag),  paste0("syn", ifelse(is.finite(messy_sol), paste0("_sol", messy_sol %/% .01), ""), ifelse(mi > 0, paste0(".M", mi), ""), "_facet.pdf"))`"}
 \end{figure}
 
 \begin{figure}[H]
 \caption{Adjusted hazard ratios for cancer incidence associated with leaving work in the \textbf{UAW-GM Cohort} (HWSE Condition 2).}
 \label{fig:hwse}
 \centering
-\includegraphics{"`r here::here(paste0("reports/resources/hwse 2/FU through 1994/Lag ", 1 + hwse2.additional.lag, "/indexed by age"), paste0("hwse", paste0("_sol", messy_sol %/% .01), ".M50_facet.pdf"))`"}
+\includegraphics{"`r here::here(paste0("reports/resources/hwse 2/FU through 1994/Lag ", 1 + hwse2.additional.lag, "/indexed by age"), paste0("hwse", paste0("_sol", messy_sol %/% .01), ifelse(mi > 0, paste0(".M", mi), ""), "_facet.pdf"))`"}
 \end{figure}
 
 \end{landscape}
 
 ```{r hwse2}
-hwse2.directory <- gsub("//", "/", here::here(paste(
-	"./reports/resources/",
-	paste0("hwse 2/FU through 1994/Lag ", 1 + hwse2.additional.lag,
-				 ifelse(employment_status.lag != 0,
-				 			 paste0("/Employment status lagged ", employment_status.lag, " years"), "")),
-	ifelse(grepl("age", hwse2.time_scale), "indexed by age", "indexed by calendar"),
-	sep = "/"
+hwse2.directory <- gsub("//", "/", here::here(paste0(
+	"reports/resources",
+	ifelse(is.finite(hwse_age_under), paste0("/under ", hwse_age_under), ""),
+	paste0("/hwse 2/FU through 1994/Lag ", 1 + hwse2.additional.lag,
+				 ifelse(employment_status.lag != 0, paste0("/Employment status lagged ", employment_status.lag, " years"), "")
+				 ),
+	ifelse(grepl("age", hwse2.time_scale), "/indexed by age", "/indexed by calendar"),
+	ifelse(mi > 0, "/mi race", "")
 )))
 
 rbindlist(
@@ -309,9 +308,9 @@ rbindlist(
 	code,
 	ifelse(is.finite(messy_sol),
 				 paste0("_sol", messy_sol %/% .01), ""),
-	ifelse(spline_year,
-				 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-				 ifelse(spline_yin, paste0("_splinedyin"), ""))
+	ifelse(spline_year, "_splinedyear", ""),
+	ifelse(spline_yin, "_splinedyin", ""),
+	ifelse(mi > 0, paste0(".M", mi), "")
 )
 		
 		# HWSE 2 model
@@ -320,21 +319,15 @@ rbindlist(
 									 "hwse2_55.coef.tab",
 									 "hwse2_60.coef.tab"
 									 )
-		dir.names <- paste0(c("Binary", paste("Age", seq(50, 60, 5))
-									 ), "/mi race")
+		dir.names <- paste0(c("Binary", paste("Age", seq(50, 60, 5))))
 		invisible(
 		sapply(1:length(tab.names), function (i = 1) {
 			assign(tab.names[i],
 						 readRDS(
 						 	paste0(hwse2.directory, "/",
 						 				 dir.names[i], "/",
-						 		code,
-						 		ifelse(is.finite(messy_sol),
-				 paste0("_sol", messy_sol %/% .01), ""),
-						 		ifelse(spline_year,
-						 					 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-						 					 ifelse(spline_yin, paste0("_splinedyin"), "")),
-							 			 ".M50.tab.rds")), envir = .GlobalEnv)
+						 				 file.prefix,
+							 			 ".tab.rds")), envir = .GlobalEnv)
 		}
 		))
 		
@@ -414,13 +407,15 @@ if (table.engine == "xtable") {
 \newpage
 
 ```{r hwse3}
-directory <- gsub("//", "/", here::here(paste(
-	"./reports/resources/hwse 3",
-	"FU through 1994",
-	paste0("Lag ", 1 + hwse3.additional.lag),
-	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
-	"mi race",
-	sep = "/"
+directory <- gsub("//", "/", here::here(paste0(
+	"reports/resources",
+	ifelse(is.finite(hwse_age_under), paste0("/under ", hwse_age_under), ""),
+	"/hwse 3",
+	"/FU through 1994",
+	paste0("/Lag ", 1 + hwse3.additional.lag),
+	ifelse(employment_status.lag != 0, paste0("/Employment status lagged ", employment_status.lag, " years"), ""),
+	ifelse(grepl("age", time_scale), "/indexed by age", "/indexed by calendar"),
+	ifelse(mi > 0, "/mi race", "")
 )))
 
 coef.tab <- readRDS(
@@ -428,10 +423,9 @@ coef.tab <- readRDS(
 		gsub("^_", "", paste0(
 			ifelse(is.finite(messy_sol),
 						 paste0("_sol", messy_sol %/% .01), ""),
-			ifelse(spline_year,
-						 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-						 ifelse(spline_yin, paste0("_splinedyin"), "")),
-			".M50.tab.rds"))))
+			ifelse(spline_year, "_splinedyear", ""),
+			ifelse(mi > 0, paste0(".M", mi), ""),
+			".tab.rds"))))
 
 		coef.tab <- clean.coef.tab(coef.tab[,c(1:6, 8)])
 		
@@ -456,12 +450,11 @@ coef.tab <- readRDS(
 ```
 
 ```{r coxph}
-directory <- gsub("//", "/", here::here(paste(
-	"./reports/resources/",
-	paste0("Lag ", exposure.lag),
-	ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
-	"mi race",
-	sep = "/"
+directory <- gsub("//", "/", here::here(paste0(
+	"reports/resources",
+	paste0("/Lag ", exposure.lag),
+	ifelse(grepl("age", time_scale), "/indexed by age", "/indexed by calendar"),
+	ifelse(mi > 0, "/mi race", "")
 )))
 
 race_coef.tab <- data.table()
@@ -476,38 +469,32 @@ invisible(
 	code,
 	ifelse(is.finite(messy_sol),
 				 paste0("_sol", messy_sol %/% .01), ""),
-	ifelse(spline_year,
-				 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-				 ifelse(spline_yin, paste0("_splinedyin"), ""))
+	ifelse(spline_year, "_splinedyear", ""),
+	ifelse(spline_yin, "_splinedyin", ""),
+	ifelse(mi > 0, paste0(".M", mi), "")
 )
 		
 		coef.tab <- readRDS(
 				paste0(directory, "/",
-				code, "_sol5",
-							 ifelse(spline_year,
-							 			 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-							 			 ifelse(spline_yin, paste0("_splinedyin"), "")),
-							 ".M50.tab.rds"))
+				file.prefix,
+				".tab.rds"))
+		
 		# HWSE 2 model
 		tab.names <- c("hwse2.coef.tab",
 									 "hwse2_50.coef.tab",
 									 "hwse2_55.coef.tab",
 									 "hwse2_60.coef.tab"
 									 )
-		dir.names <- paste0(c("Binary", paste("Age", seq(50, 60, 5))), "/mi race")
+		dir.names <- paste0(c("Binary", paste("Age", seq(50, 60, 5))),
+												ifelse(mi > 0, "/mi race", ""))
 		invisible(
 		sapply(1:length(tab.names), function (i = 1) {
 			assign(tab.names[i],
 						 readRDS(
 						 	paste0(hwse2.directory, "/",
 						 				 dir.names[i], "/",
-						 		code,
-						 		ifelse(is.finite(messy_sol),
-				 paste0("_sol", messy_sol %/% .01), ""),
-						 		ifelse(spline_year,
-						 					 ifelse(spline_yin, paste0("_splined"), "_splinedyear"),
-						 					 ifelse(spline_yin, paste0("_splinedyin"), "")),
-							 			 ".M50.tab.rds")), envir = .GlobalEnv)
+						 		file.prefix,
+						 		".tab.rds")), envir = .GlobalEnv)
 		}
 		))
 		

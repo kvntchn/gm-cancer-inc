@@ -77,27 +77,28 @@ The presence of the healthy worker survivor effect (HWSE) implies the presence o
 
 - Restricted to
   - Those alive and under age 75 on January 1, 1985
+  - Hired in or after 1938
   - Missing no more than half of their work history
-  - No discrepancy identified
-  - No job history pattern with 1977
-  - Record has reliable job history data (not an odd end)
-  - Eligible for cancer follow-up (2004, 2009, and 2015)
 - Leaving work and cancer incidence
-	- FU spans 1985--1994
+	- FU spans 1985--1994 (includes SEER)
 - MWF exposure and leaving work
-	- FU spans 3 years after hire throuh 1994, death, or leaving work
+	- FU spans 3 years after hire through 1994, death, or leaving work
+
+# An important change!
+
+- Among those with `yrout09_new < yout15`, use `yrout09_new` as the leaving work variable
 
 # Characteristics
 
 ```{r, eval=F}
 source("../gm-wrangling/wrangling/table1.R")
 hwse2.tab1 <- get.tab1(copy(cohort2), mathmode = F)
-cancer_male.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_first == 1 & (ddiag_first <= yoc | is.na(yoc)),studyno]]), mathmode = F)
-cancer_pr.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_pr == 1 & (ddiag_pr <= yoc | is.na(yoc)),studyno]]), mathmode = F)
-cancer_lu.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_lu == 1 & (ddiag_lu <= yoc | is.na(yoc)),studyno]]), mathmode = F)
-cancer_corec.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_corec == 1 & (ddiag_corec <= yoc | is.na(yoc)),studyno]]), mathmode = F)
-cancer_female.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_female[canc_first == 1 & (ddiag_first <= yoc | is.na(yoc)),studyno]]), mathmode = F)
-hwse3.tab1 <- get.tab1(copy(cohort2_big[year <= year(jobloss.date)]), mathmode = F)
+cancer_male.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_first == 1 & (ddiag_first <= yoc | is.na(yoc)),studyno] & (year <= year(yoc) | is.na(yoc))]), mathmode = F)
+cancer_pr.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_pr == 1 & (ddiag_pr <= yoc | is.na(yoc)),studyno] & (year <= year(yoc) | is.na(yoc))]), mathmode = F)
+cancer_lu.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_lu == 1 & (ddiag_lu <= yoc | is.na(yoc)),studyno] & (year <= year(yoc) | is.na(yoc))]), mathmode = F)
+cancer_corec.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_male[canc_corec == 1 & (ddiag_corec <= yoc | is.na(yoc)),studyno] & (year <= year(yoc) | is.na(yoc))]), mathmode = F)
+cancer_female.tab1 <- get.tab1(copy(cohort2[studyno %in% cohort2_female[canc_first == 1 & (ddiag_first <= yoc | is.na(yoc)),studyno] & (year <= year(yoc) | is.na(yoc))]), mathmode = F)
+hwse3.tab1 <- get.tab1(copy(cohort2_big[year <= year(jobloss.date) & (year <= year(yoc) | is.na(yoc))]), mathmode = F)
 
 save(list = paste0(c("hwse2", "cancer_male", "cancer_pr", "cancer_lu", "cancer_corec", "cancer_female", "hwse3"), ".tab1"),
      file = here::here("reports/replicate garcia 2017", "tab1.rdata"))
@@ -125,7 +126,8 @@ clean_tab <- function(tab1 = hwse2.tab1, column_name) {
 ```{r}
 cbind(clean_tab(hwse2.tab1, "Cancer follow-up"),
       " " = NA,
-      clean_tab(hwse3.tab1, "Employment follow-up"))[
+      clean_tab(hwse3.tab1, "Employment follow-up")
+			)[
         1:grep("Deceased", rownames(hwse2.tab1)),] %>% xtable(
           align = "lrlcrl"
         ) %>% print(
@@ -195,7 +197,7 @@ clean_tab(cancer_female.tab1, "All cancers")[
 \end{column}
 \end{columns}
 
-- If cancer incidence date was the same as the date of leaving work, it was considered to have occurred after leaving work
+- If cancer incidence date was the same year as leaving work, it was considered to have occurred after leaving work
 - If cancer incidence date was after date of death, it was assumed to have been on the day of death
 
 # 2. Leaving work by age 50 and cancer incidence
@@ -214,7 +216,16 @@ where $a$ is the indicator of having left work, $t$ is age, and $x$ is a vector 
 
 # 2. Leaving work and cancer incidence
 
-\centering\includegraphics[width=0.8\linewidth]{`r here::here("reports/resources/replicate garcia 2017/hwse 2/FU through 1994/Lag 1/indexed by age/", "hwse2.pdf")`}
+\centering\includegraphics[width=0.8\linewidth]{`r here::here("reports/resources/replicate garcia 2017/hwse 2/FU through 1994/Lag 1/indexed by age", "hwse2.pdf")`}
+
+# 2. Leaving work and cancer incidence (what I did most recently, but new YOUT and FU until 75)
+
+\centering\includegraphics[width=0.8\linewidth]{`r here::here("reports/resources/garcia yout/under 75/hwse 2/FU 1985 through 1994/Lag 1/indexed by age", "hwse2_selected.pdf")`}
+
+# 2. Leaving work and cancer incidence (lagged employment status)
+
+\centering\includegraphics[width=0.8\linewidth]{`r here::here("reports/resources/garcia yout/under 75/hwse 2/FU through 1994/Lag 1/Employment status lagged 1 years/indexed by age", "hwse2_selected.pdf")`}
+
 
 # 3. Prior exposure and leaving work
 
@@ -283,6 +294,67 @@ women_coef.tab[,.(
   ))
 ), Covariate][grepl("Cumulative", Covariate),-1] %>% xtable
 
+
+```
+
+
+# 3. Prior exposure and leaving work (what I did most recently)
+
+```{r}
+hwse3.dir <- here::here(paste0(
+		"./reports/resources",
+		paste0(paste0("/hwse 3",
+									paste0("/FU through 1994"),
+									"/Lag ", 1),
+					 "/indexed by age"
+		)))
+
+hwse3_coef.tab <- readRDS(paste0(hwse3.dir, "/sol5_splined.coef.rds"))
+```
+
+\footnotesize\centering
+
+```{r}
+hwse3_coef.tab[,.(
+  `\\multicolumn{2}{l}{MWF exposure}\n%` = c(
+    paste0("\\multicolumn{5}{l}{", gsub(" [0-9].*", "", Covariate[1]), "}\\\\\n"),
+    rep(NA, .N - 1)),
+  "\n" = level, n,
+  `Adjusted HR` = round(HR, 2),
+  `(95\\% CI)` = ifelse(is.na(lower.ci), "", paste0(
+    "(", round(lower.ci, 2), ", ", round(upper.ci, 2), ")"
+  ))
+), Covariate][grepl("Cumulative", Covariate),-1] %>% xtable
+
+```
+
+# 3. Prior exposure and leaving work (what I did most recently, but new YOUT and FU until 75)
+
+```{r}
+hwse3.dir <- here::here(paste0(
+		"./reports/resources/garcia yout/under 75",
+		paste0(paste0("/hwse 3",
+									paste0("/FU through 1994"),
+									"/Lag ", 1),
+					 "/indexed by age"
+		)))
+
+hwse3_new_yout_coef.tab <- readRDS(paste0(hwse3.dir, "/sol5.coef.rds"))
+```
+
+\footnotesize\centering
+
+```{r}
+hwse3_new_yout_coef.tab[,.(
+  `\\multicolumn{2}{l}{MWF exposure}\n%` = c(
+    paste0("\\multicolumn{5}{l}{", gsub(" [0-9].*", "", Covariate[1]), "}\\\\\n"),
+    rep(NA, .N - 1)),
+  "\n" = level, n,
+  `Adjusted HR` = round(HR, 2),
+  `(95\\% CI)` = ifelse(is.na(lower.ci), "", paste0(
+    "(", round(lower.ci, 2), ", ", round(upper.ci, 2), ")"
+  ))
+), Covariate][grepl("Cumulative", Covariate),-1] %>% xtable
 
 ```
 
