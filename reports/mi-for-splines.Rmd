@@ -49,13 +49,13 @@ The MI point estimate is $\bar Q_M$. The variance estimator of $\bar Q_M$ is
 
 $$T_M = \bar U_{M} + \left(1 + \frac{1}{M}\right)\ B_M$$
 
-## Cox proportional hazards model for stomach cancer and metalworking fluid exposure
+## Cox proportional hazards model for non-Hodgkin lymphoma and metalworking fluid exposure
 
 The code chunk below loads the raw GM data as well as helper functions for building the analytic data and doing analyses. By default, it is set not to run when compiling this document; the code is provided for your reference. Instead, we will simply load the relevant data in the next chunk. When invoking the `get.coxph()` function, set `mi = 5` in order to get $M = 5$ sets of imputed race data.
 
 ```{r, eval=F}
 # Get data and helper functions for building analytic data
-source(here::here("get-data.R"))
+source(here("get-data.R"))
 source(here("incidence.R"))
 
 # Build analytic data for Cox PH analysis for NHL
@@ -91,10 +91,10 @@ Before doing the MI, consider the code for running a Cox model with splined expo
 # Set those of missing race to be their own separate category
 nhl.dat[finrace %in% c(0, 9), Race := "Unknown"]
 
-# Run Cox PH model
-nhl.coxph <- coxph(
+# Run Cox PH models
+nhl_straight.coxph <- coxph(
 	Surv(age.year1, age.year2, status) ~
-		pspline(cum_straight, df = 0) +
+		pspline(cum_straight, df = 3) +
 		`Cumulative soluble 5` +
 		`Cumulative synthetic` +
 		Year +
@@ -103,64 +103,125 @@ nhl.coxph <- coxph(
 	data = nhl.dat[immortal != 1 & right.censored != 1],
 	method = "efron")
 
+nhl_soluble.coxph <- coxph(
+	Surv(age.year1, age.year2, status) ~
+		`Cumulative straight` +
+		pspline(cum_soluble, df = 3) +
+		`Cumulative synthetic` +
+		Year +
+		`Year of hire` + 
+		Race + Plant + Sex,
+	data = nhl.dat[immortal != 1 & right.censored != 1],
+	method = "efron")
+
+
 # Save output to Box
 box_write(
-	nhl.coxph,
-	"nhl.coxph.rds",
+	nhl_straight.coxph,
+	"nhl_straight.coxph.rds",
+	139229852587)
+
+box_write(
+	nhl_soluble.coxph,
+	"nhl_soluble.coxph.rds",
 	139229852587)
 ```
 
 Using the model output, we can plot the spline in the way suggested by @Therneau_2021. The `termplot()` function is a built-in function in `R` which plots regression terms against their predictors. The function outputs the predicted value and associated standard error over a fine grid of values given by the domain of the predictor.
 
 ```{r, results="markup"}
-# Get Cox model result from Box
-nhl.coxph <- box_read(822616524220)
+# Get Cox model results from Box
+nhl_straight.coxph <- box_read(823353935842)
+nhl_soluble.coxph <- box_read(823353126811)
 
 # Check the terms in the model
-attr(terms(nhl.coxph), "term.labels")
+attr(terms(nhl_straight.coxph), "term.labels")
 
 # Use the built-in function to plot the spline
-termplot(nhl.coxph,
+termplot(nhl_straight.coxph,
 				 # We use term = 1 because the first term in
 				 # the model is for splined straight exposure
 				 term = 1,
+				 se = T, col.term = 1, col.se = 1)
+
+# Check the terms in the model
+attr(terms(nhl_soluble.coxph), "term.labels")
+
+# Use the built-in function to plot the spline
+termplot(nhl_soluble.coxph,
+				 # We use term = 2 because the first term in
+				 # the model is for splined soluble exposure
+				 term = 2,
 				 se = T, col.term = 1, col.se = 1)
 ```
 
 We can do better by extracting the values from the output of `termplot()`, subtracting the partial effect of 0 straight exposure, and exponentiating to get adjusted hazard ratios.
 
-```{r, fig.height=3*1.5, fig.width=4*1.5, fig.cap="Adjusted hazard ratio of NHL associated with cumulative exposure to straights. Missing race treated as separate category."}
-# Save data used to generate the plot above
-nhl.termplot <- termplot(nhl.coxph, term = 1, se = T, plot = F)
+```{r, fig.height=3*1.25, fig.width=((4 - 0.5) * 2 + 0.5)*1.25, fig.cap="Figure 2. Adjusted hazard ratio of NHL associated with cumulative exposure to straight and soluble metalworking fluids. Missing race treated as separate category.", cache=T}
+# Make helper function for extracting termplot items
+get.ggtab <- function(mod.coxph, term, mwf_ref, mwf, mwf_max.quantile) {
+	# Save data used to generate the plot above
+	termplot <- termplot(mod.coxph, term = term, se = T, plot = F)
+	
+	# Extract the relevant quantities
+	ggtab <- data.frame(
+		exposure = termplot[[1]]$x,
+		`Point estimate` = termplot[[1]]$y,
+		se = termplot[[1]]$se,
+		Reference = mean(with(
+			termplot[[1]], y[signif(x, 2) <= mwf_ref])),
+		mwf_ref = mwf_ref,
+		df = mod.coxph$df[term],
+		check.names = F
+	)
+	setDT(ggtab)
+	setorder(ggtab, exposure)
+	
+	# Subtract the hazard at the reference level of exposure
+	ggtab[,`:=`(
+		`Point estimate` = `Point estimate` - Reference
+	)]
+	
+	# Set the level of exposure at which we truncate the graph
+	ggtab$mwf_max <- quantile(mwf, mwf_max.quantile)
+	
+	# Thin out grid, if desired
+	target_resolution <- max(50 * (max(ggtab$mwf_max) - min(mwf_ref)), 1500)
+			if (nrow(ggtab) > target_resolution) {
+				ggtab <- ggtab[
+					seq(1, nrow(ggtab), nrow(ggtab)/(50 * (mwf_max[1] - mwf_ref[1])))]
+			}
+	
+	return(ggtab)
+}
 
-# Extract the relevant quantities
-nhl.ggtab <- data.frame(
-				exposure = nhl.termplot[["cum_straight"]]$x,
-				`Point estimate` = nhl.termplot[["cum_straight"]]$y,
-				se = nhl.termplot[["cum_straight"]]$se,
-				Reference = mean(with(nhl.termplot[["cum_straight"]],
-												y[signif(x, 2) == 0])),
-				df = nhl.coxph$df[1],
-				check.names = F
-			)
-setDT(nhl.ggtab)
-setorder(nhl.ggtab, exposure)
+# Use helper function 
+nhl_straight.ggtab <- get.ggtab(
+	nhl_straight.coxph, 1, 0, nhl.dat[, cum_straight[.N], studyno]$V1, 0.99)
+nhl_soluble.ggtab <- get.ggtab(
+	nhl_soluble.coxph, 2, 0.05, nhl.dat[, cum_soluble[.N], studyno]$V1, 0.99)
 
-# Subtract the hazard at the reference level of exposure
-nhl.ggtab[,`:=`(
-	`Point estimate` = `Point estimate` - Reference
-)]
+nhl.ggtab <- rbindlist(
+	list("Straight" = nhl_straight.ggtab, "Soluble" = nhl_soluble.ggtab),
+	idcol = "mwf"
+	)[signif(exposure, 2) > mwf_ref & exposure < mwf_max]
 
-# Set the level of exposure at which we truncate the graph
-mwf_max <- quantile(nhl.dat$cum_straight, 1)
+# Rugplot data
+rugplot.tab <- melt(
+		nhl.dat[status == 1,.(Straight = cum_straight, Soluble = cum_soluble)],
+		measure.vars = c("Straight", "Soluble"),
+		value.name = "exposure",
+		variable.name = "mwf"
+		)
+rugplot.tab$`Point estimate` <- -Inf
 
-# Thin out grid, if desired
-nhl.ggtab <- nhl.ggtab[seq(
-	1, .N,
-	length.out = (max(exposure) - min(exposure)) * 50)]
+rugplot.tab <- merge(
+	rugplot.tab,
+	nhl.ggtab[,.(mwf_max = mwf_max[1]), mwf],
+	by = "mwf")[exposure < mwf_max]
 
 # Plot spline
-nhl.ggtab[exposure > 0 & exposure <= mwf_max] %>% ggplot(
+nhl.ggtab %>% ggplot(
 	aes(x = exposure, y = exp(`Point estimate`))) +
 	stat_function(fun = function(x) {1}, geom = 'line',
 								color = 'grey') +
@@ -169,18 +230,21 @@ nhl.ggtab[exposure > 0 & exposure <= mwf_max] %>% ggplot(
 		ymax = exp(`Point estimate` + qnorm(0.975) * se)),
 		alpha = 0.1) +
 	geom_line() +
-	geom_label(aes(
-		x = ifelse(nchar(signif(nhl.ggtab$df[1], 3)) > 1,
+	geom_label(
+		data = nhl.ggtab[,.(df = df[1], mwf_max = mwf_max[1]), mwf],
+		aes(
+		x = ifelse(nchar(signif(df, 3)) > 1,
 							 0.04, 0.02) * (mwf_max),
 		y = 4.45,
-		label = paste0("df = ", signif(nhl.ggtab$df[1], 3))),
-		size = 4) +
-	coord_cartesian(xlim = c(0, mwf_max),
-									ylim = c(0.5, 4.5)) +
+		label = paste0("df = ", signif(df, 3))),
+		size = 2.5) +
+	geom_rug(data = rugplot.tab, length = unit(0.015, "npc")) +
+	facet_wrap(. ~ mwf, scales = "free_x") +
+	coord_cartesian(ylim = c(0.5, 4.5)) +
 	labs(
-		x = bquote('Cumulative exposure to straights (mg/m' ^3 %.% 'years)'),
+		x = bquote('Cumulative exposure (mg/m' ^3 %.% 'years)'),
 		y = "HR of NHL") + 
-	theme_bw()
+	theme_bw() + theme(strip.text = element_text(size = 11))
 
 ```
 
@@ -189,7 +253,7 @@ nhl.ggtab[exposure > 0 & exposure <= mwf_max] %>% ggplot(
 To get the MI spline estimate, we simply repeat the analysis above $M = 5$ times, where in each iteration, we use a different imputed set for race. The code below is nearly identical to that above, except many of the actions are wrapped inside a `lapply()` function.
 
 ```{r, eval=F}
-nhl_mi.coxph <- lapply(1:5, function(i = 1) {
+nhl_straight_mi.coxph <- lapply(1:5, function(i = 1) {
 	
 	# Get imputed race
 	dat <- merge(nhl.dat, nhl.mi_race.M5[[i]],
@@ -201,7 +265,7 @@ nhl_mi.coxph <- lapply(1:5, function(i = 1) {
 	# Run Cox PH model
 	nhl.coxph <- coxph(
 	Surv(age.year1, age.year2, status) ~
-		pspline(cum_straight, df = 3.58) +
+		pspline(cum_straight, df = 3) +
 		`Cumulative soluble 5` +
 		`Cumulative synthetic` +
 		Year +
@@ -214,69 +278,126 @@ nhl_mi.coxph <- lapply(1:5, function(i = 1) {
 	
 })
 
+nhl_soluble_mi.coxph <- lapply(1:5, function(i = 1) {
+	
+	# Get imputed race
+	dat <- merge(nhl.dat, nhl.mi_race.M5[[i]],
+							 by = c("studyno", "year"),
+							 all.x = T, all.y = F)
+	dat[finrace %in% c(0, 9), Race := Race.impute]
+	dat[,Race := factor(Race, levels = c("White", "Black"))]
+	
+	# Run Cox PH model
+	nhl.coxph <- coxph(
+	Surv(age.year1, age.year2, status) ~
+		`Cumulative straight` +
+		pspline(cum_soluble, df = 3) +
+		`Cumulative synthetic` +
+		Year +
+		`Year of hire` + 
+		Race + Plant + Sex,
+	data = dat[immortal != 1 & right.censored != 1],
+	method = "efron")
+	
+	return(nhl.coxph)
+	
+})
+
 # Save output to Box
-box_save(nhl_mi.coxph,
-				 file_name = paste0("nhl_mi.coxph.rdata"),
+box_save(nhl_straight_mi.coxph,
+				 file_name = paste0("nhl_straight_mi.coxph.rdata"),
+				 dir_id = 139229852587)
+
+# Save output to Box
+box_save(nhl_soluble_mi.coxph,
+				 file_name = paste0("nhl_soluble_mi.coxph.rdata"),
 				 dir_id = 139229852587)
 ```
 
 ```{r, results="hide"}
 # Load spline model output from Box
-box_load(822857562054)
+box_load(823374299857)
+box_load(823390147330)
+```
 
-nhl_mi.ggtab <- lapply(1:5, function(i) {
-	# Save data used to generate the spline plots
-	nhl.termplot <- termplot(nhl_mi.coxph[[i]], term = 1, se = T, plot = F)
-	
-	# Extract relevant quantities
-	nhl.ggtab <- data.frame(
-		exposure = nhl.termplot[["cum_straight"]]$x,
-		`Point estimate` = nhl.termplot[["cum_straight"]]$y,
-		se = nhl.termplot[["cum_straight"]]$se,
-		Reference = mean(with(nhl.termplot[["cum_straight"]],
-										y[signif(x, 2) == 0])),
-		df = nhl_mi.coxph[[i]]$df[1],
-		check.names = F
-	)
-	setDT(nhl.ggtab)
-	setorder(nhl.ggtab, exposure)
-	
-	# Contrast to reference
-	nhl.ggtab[,`:=`(
-		`Point estimate` = `Point estimate` - Reference
-	)]
-	
-	return(nhl.ggtab)
-})
+```{r}
+# Give data some within-individual indexing
+setorder(nhl.dat, studyno, year)
+nhl.dat[immortal != 1 & right.censored != 1,
+				`:=`(I = 1:(.N), N = .N), studyno]
+
+for (mwf in c("straight", "soluble")) {
+	assign(paste0("nhl_", mwf, "_mi.ggtab"),
+				 lapply(1:5, function(i) {
+				 	# Save data used to generate the spline plots
+				 	nhl.termplot <- termplot(
+				 		get(paste0("nhl_", mwf, "_mi.coxph"))[[i]],
+				 		term = which(c("straight", "soluble") == mwf),
+				 		se = T, plot = F)
+				 	
+				 	# Extract relevant quantities
+				 	nhl.ggtab <- data.frame(
+				 		exposure = nhl.termplot[[1]]$x,
+				 		`Point estimate` = nhl.termplot[[1]]$y,
+				 		se = nhl.termplot[[1]]$se,
+				 		Reference = mean(with(
+				 			nhl.termplot[[1]],
+				 			y[signif(x, 2) <= c(0, 0.05)[
+				 				which(c("straight", "soluble") == mwf)]
+				 				])),
+				 		df = get(paste0("nhl_", mwf, "_mi.coxph"))[[i]]$df[
+				 			which(c("straight", "soluble") == mwf)
+				 		],
+				 		mwf_ref = c(0, 0.05)[
+				 				which(c("straight", "soluble") == mwf)],
+				 		mwf_max = as.numeric(quantile(
+				 			unlist(nhl.dat[I == N, paste0("cum_", mwf), with = F]),
+				 			0.99)),
+				 		check.names = F
+				 	)
+				 	setDT(nhl.ggtab)
+				 	setorder(nhl.ggtab, exposure)
+				 	
+				 	# Contrast to reference
+				 	nhl.ggtab[,`:=`(
+				 		`Point estimate` = `Point estimate` - Reference
+				 	)]
+				 	
+				 	# Thin out grid, if desired
+				 	target_resolution <- max(50 * (max(nhl.ggtab$mwf_max) - min(nhl.ggtab$mwf_ref)), 1500)
+				 	if (nrow(nhl.ggtab) > target_resolution) {
+				 		nhl.ggtab <- nhl.ggtab[
+				 			seq(1, nrow(nhl.ggtab), nrow(nhl.ggtab)/(50 * (mwf_max[1] - mwf_ref[1])))]
+				 	}
+				 	
+				 	return(nhl.ggtab)
+				 }))
+}
 ```
 
 Now that we have a list of $M = 5$ sets of spline point estimates and standard errors, we combine them according to the formulas summarized above. The MI point estimate is simply the mean across the $M = 5$ point estimates. The variance estimate for the MI point estimate is a linear combination of the mean variance across the $M = 5$ variances and the excess variance. This must be done for every point over the fine grid of values given by the domain of the predictor.
 
-```{r, fig.height=(2.5 * 2 + 0.5) * 1.5, fig.width=4 * 1.5, fig.cap="Adjusted hazard ratio of NHL associated with cumulative exposure to straights."}
+```{r, fig.height=3*1.25, fig.width=((4 - 0.5) * 2 + 0.5)*1.25, fig.cap="Figure 3. Adjusted hazard ratio of NHL associated with cumulative exposure to straight and soluble metalworking fluids. Missing race handled by multiple imputation", cache=T}
 # Get pooled estimates
-nhl_mi.ggtab <- rbindlist(nhl_mi.ggtab)[, .(
+nhl_mi.ggtab <- rbindlist(list(
+    "Straight" = rbindlist(nhl_straight_mi.ggtab),
+    "Soluble" = rbindlist(nhl_soluble_mi.ggtab)),
+    idcol = "mwf")[, .(
 	`Point estimate` = mean(`Point estimate`),
 	se.pooled = sqrt(mean(se^2)),
 	var.excess = sum((`Point estimate` - mean(`Point estimate`))^2/(
-		length(nhl_mi.ggtab) - 1)),
-	df = unique(df)
-), by = .(exposure)]
+		5 - 1)),
+	df = unique(df),
+	mwf_ref = mwf_ref[1],
+	mwf_max = mwf_max[1]
+), by = .(exposure, mwf)]
 
 # Calculate the standard error of the MI estimate
-nhl_mi.ggtab[, `:=`(
-	se = sqrt(se.pooled^2 + (1 + 1/length(nhl_mi.ggtab)) * var.excess),
-	df = mean(df))]
-
-# Thin out grid, if desired
-nhl_mi.ggtab <- nhl_mi.ggtab[seq(
-	1, .N,
-	length.out = (max(exposure) - min(exposure)) * 50)]
+nhl_mi.ggtab[, se := sqrt(se.pooled^2 + (1 + 1/5) * var.excess)]
+nhl_mi.ggtab[, df := mean(df), mwf]
 
 # Plot splines
-rbindlist(list(
-	"Missing race handled by multiple imputation" = nhl_mi.ggtab[exposure > 0 & exposure <= mwf_max],
-	"Missing race treated as separate category" = nhl.ggtab[exposure > 0 & exposure <= mwf_max]
-	), idcol = "Method for missing race", fill = T) %>% ggplot(
+nhl_mi.ggtab[exposure > mwf_ref & exposure <= mwf_max] %>% ggplot(
 	aes(x = exposure, y = exp(`Point estimate`))) +
 	stat_function(fun = function(x) {1}, geom = 'line',
 								color = 'grey') +
@@ -285,20 +406,20 @@ rbindlist(list(
 		ymax = exp(`Point estimate` + qnorm(0.975) * se)),
 		alpha = 0.1) +
 	geom_line() +
-	geom_label(aes(
-		x = ifelse(
-			nchar(signif(df, 3)) > 1,
-			0.04, 0.02) * (mwf_max),
+	geom_rug(data = rugplot.tab, length = unit(0.015, "npc")) +
+	geom_label(data = nhl_mi.ggtab[,.(
+		df = df[1], mwf_max = mwf_max[1]
+	), mwf], aes(
+		x = 0.04 * mwf_max,
 		y = 4.45,
 		label = paste0("df = ", signif(df, 3))),
-		size = 4) +
-	coord_cartesian(xlim = c(0, mwf_max),
-									ylim = c(0.5, 4.5)) +
-	facet_wrap(. ~ `Method for missing race`, ncol = 1) +
+		size = 2.5) +
+	coord_cartesian(ylim = c(0.5, 4.5)) +
+	facet_wrap(. ~ mwf, scales = "free_x") +
 	labs(
-		x = bquote('Cumulative exposure to straights (mg/m' ^3 %.% 'years)'),
+		x = bquote('Cumulative exposure (mg/m' ^3 %.% 'years)'),
 		y = "HR of NHL") + 
-	theme_bw()
+	theme_bw() + theme(strip.text = element_text(size = 11))
 ```
 
 
