@@ -142,11 +142,10 @@ if (!('cohort_analytic' %in% ls())) {
 
 	# Drop unnecessary data ####
 	cohort_analytic <- cohort_analytic[
-		wh == 1 & nohist == 0,
+		wh == 1 & nohist == 0 &
 			# cancinccoh15_new == 1 &
 			possdiscr_new == 0,
 		# & immortal == 0 & right.censored == 0
-		,
 		col.names, with = F]
 }
 

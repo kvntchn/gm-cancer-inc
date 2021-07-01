@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
 	results = 'asis')
 
 # Packages to load or install, if needed
-packages <- c("here", "knitr", "tidyverse", "data.table", "lubridate", "Hmisc", "survival", "boxr")
+packages <- c("here", "knitr", "tidyverse", "data.table", "lubridate", "Hmisc", "survival", "boxr", "tikzDevice", "xtable")
 
 # Load or install packages
 invisible(sapply(packages, function(package) {
@@ -54,8 +54,13 @@ $$T_M = \bar U_{M} + \left(1 + \frac{1}{M}\right)\ B_M$$
 The code chunk below loads the raw GM data as well as helper functions for building the analytic data and doing analyses. By default, it is set not to run when compiling this document; the code is provided for your reference. Instead, we will simply load the relevant data in the next chunk. When invoking the `get.coxph()` function, set `mi = 5` in order to get $M = 5$ sets of imputed race data.
 
 ```{r, eval=F}
-# Get data and helper functions for building analytic data
-source(here("get-data.R"))
+# # Get data and helper functions for building analytic data
+# source(here("get-data.R"))
+# box_save(
+# 	list = ls(),
+# 	file_name = "cohort_analytic.rdata",
+# 	dir_id = 139229852587)
+box_load(828354451667)
 source(here("incidence.R"))
 
 # Build analytic data for Cox PH analysis for NHL
