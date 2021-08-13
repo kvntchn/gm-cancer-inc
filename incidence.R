@@ -49,6 +49,7 @@ get.coxph <- function(
 	cohort_name = NULL,
 	run_model = F,
 	save_dat = T,
+	get_dat = T,
 	messy_sol = 0.05,
 	spline_year = F,
 	year.df = 0,
@@ -61,6 +62,7 @@ get.coxph <- function(
 	additional.lag = 0,
 	directory.name = NULL,
 	employment_status.lag = 0,
+	employment_duration.lag = 0,
 	year.max = 2015,
 	start_m = 1,
 	mi = 0,
@@ -94,6 +96,8 @@ get.coxph <- function(
 			} else {
 				cohort_name <- "cohort_analytic"
 			}}
+
+		if (get_dat) {
 
 		dat <- data.table::copy(get(cohort_name))
 
@@ -207,17 +211,9 @@ get.coxph <- function(
 			year < 1985]) > 0) {
 			message("Cancer incidence FU for plant 3 before 1985?")}
 
-		# Lag leaving work ####
-		dat[,`:=`(
-			employment_status_lag = employment_status.lag,
-			unlagged_jobloss.date = jobloss.date,
-			unlagged_age.leavework = time_length(difftime(jobloss.date, yob), 'year'))]
-
 		# Censor when (lagged) employment status not known ####
 		if (hwse2 | hwse3) {
 			if (employment_status.lag > 0) {
-				dat[,`:=`(jobloss.date = jobloss.date[1] + years(employment_status.lag)
-				), by = .(studyno)]
 				dat <- dat[jobloss.date <= as.Date(paste0(
 					1994 + employment_status.lag, "-12-31")) |
 						year <= 1994 + employment_status.lag]
@@ -328,7 +324,7 @@ get.coxph <- function(
 
 		# Duration of employment ####
 		dat[, `:=`(
-			`Employment years` = time_length(difftime(as.Date(
+			employment.years = time_length(difftime(as.Date(
 				apply(data.frame(
 					jobloss.date,
 					as.Date(paste0(year + 1, "-01-01")),
@@ -337,33 +333,15 @@ get.coxph <- function(
 			),
 			yin), 'year'))]
 
+		# Duration of employment lag
+		if (employment_duration.lag != 0) {
+		dat[, employment.years := shift(employment.years, employment_duration.lag, 0)]}
+
 		# Age at leaving work (before employment status lag)
 		dat[,`:=`(age.leavework = time_length(difftime(jobloss.date, yob), 'year'))]
 
 		# Define quantiles ####
-		covariate.breaks <- apply(dat[status == 1, .(
-			year,
-			yin = yin.gm,
-			`Employment years`,
-			age = age.year2 / 365)], 2, function(x) {
-				if (length(x) > 100) {
-					breaks <- quantile(x, seq(0, 1, 1 / 6))
-				} else if (length(x) > 80) {
-					breaks <- quantile(x, seq(0, 1, 1 / 5))
-				} else if (length(x) > 60) {
-					breaks <- quantile(x, seq(0, 1, 1 / 4))
-				} else if (length(x) > 40) {
-					breaks <- quantile(x, seq(0, 1, 1 / 3))
-				} else {
-					breaks <- quantile(x, seq(0, 1, 1 / 2))
-				}
-				breaks[-length(breaks)] <- floor(breaks[-length(breaks)])
-				breaks[length(breaks)] <- ceiling(breaks[length(breaks)])
-				breaks[c(1, length(breaks))] <- c(-Inf, Inf)
-				breaks
-			})
-
-		covariate.breaks <- as.data.table(covariate.breaks)
+		covariate.breaks <- get.covariate.breaks(dat)
 
 		# # Pool last two calendar year levels
 		# covariate.breaks[is.finite(year), year := {
@@ -376,116 +354,7 @@ get.coxph <- function(
 		# # Restrict lower bound of last Year category?
 		# covariate.breaks[year > 2010 & is.finite(year), year := NA]
 
-		mwf.breaks <- cbind(apply(dat[status == 1, .(
-			straight,
-			soluble,
-			synthetic,
-			off,
-			cum_straight,
-			# cum_soluble,
-			cum_synthetic,
-			cum_off)], 2, function(x) {
-				x <- x[x > 0]
-				if (length(x) > 40) {
-					if (length(x) > 60) {
-						probs <- seq(0, 1, 1 / 3)
-					} else {
-						probs <- seq(0, 1, 1 / 2)
-					}
-					breaks <- quantile(x, probs)
-					breaks[c(1, length(probs))] <- c(0, Inf)
-					breaks <- c(-Inf, breaks)
-				} else {
-					breaks <- c(-Inf, 0, Inf)
-				}
-				if (length(breaks) < 5) {
-					breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-				}
-				names(breaks) <- NULL
-				breaks
-			}),
-			apply(dat[status == 1, .(cum_soluble)], 2, function(x) {
-				x <- x[x > 0]
-				if (length(x) > 40) {
-					if (length(x) > 60) {
-						probs <- seq(0, 1, 1 / 3)
-					} else {
-						probs <- seq(0, 1, 1 / 2)
-					}
-					breaks <- quantile(x[x > 0], probs)
-					breaks[c(1, length(probs))] <- c(0, Inf)
-					breaks <- c(-Inf, breaks)
-				} else {
-					breaks <- c(-Inf, 0, Inf)
-				}
-				if (length(breaks) < 5) {
-					breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-				}
-				breaks
-			}),
-			apply(dat[status == 1, .(cum_soluble5 = cum_soluble,
-															 soluble5 = soluble)], 2, function(x) {
-															 	x <- x[x > 0.05]
-															 	if (length(x) > 40) {
-															 		if (length(x) > 60) {
-															 			probs <- seq(0, 1, 1 / 3)
-															 		} else {
-															 			probs <- seq(0, 1, 1 / 2)
-															 		}
-															 		breaks <- quantile(x[x > 0], probs)
-															 		breaks[c(1, length(probs))] <- c(0.05, Inf)
-															 		breaks <- c(-Inf, breaks)
-															 	} else {
-															 		breaks <- c(-Inf, 0.05, Inf)
-															 	}
-															 	if (length(breaks) < 5) {
-															 		breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-															 	}
-															 	breaks
-															 }),
-			apply(dat[status == 1, .(cum_soluble127 = cum_soluble,
-															 soluble127 = soluble)], 2, function(x) {
-															 	x <- x[x > 1.2742]
-															 	if (length(x) > 40) {
-															 		if (length(x) > 60) {
-															 			probs <- seq(0, 1, 1 / 3)
-															 		} else {
-															 			probs <- seq(0, 1, 1 / 2)
-															 		}
-															 		breaks <- quantile(x[x > 0], probs)
-															 		breaks[c(1, length(probs))] <- c(1.2742, Inf)
-															 		breaks <- c(-Inf, breaks)
-															 	} else {
-															 		breaks <- c(-Inf, 1.2742, Inf)
-															 	}
-															 	if (length(breaks) < 5) {
-															 		breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-															 	}
-															 	breaks
-															 }),
-			apply(dat[status == 1, .(cum_soluble11 = cum_soluble,
-															 soluble11 = soluble)], 2, function(x) {
-															 	x <- x[x > 0.11]
-															 	if (length(x) > 40) {
-															 		if (length(x) > 60) {
-															 			probs <- seq(0, 1, 1 / 3)
-															 		} else {
-															 			probs <- seq(0, 1, 1 / 2)
-															 		}
-															 		breaks <- quantile(x[x > 0], probs)
-															 		breaks[c(1, length(probs))] <- c(0.11, Inf)
-															 		breaks <- c(-Inf, breaks)
-															 	} else {
-															 		breaks <- c(-Inf, 0.11, Inf)
-															 	}
-															 	if (length(breaks) < 5) {
-															 		breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-															 	}
-															 	breaks
-															 })
-		)
-
-		mwf.breaks <- as.data.table(mwf.breaks)
+		mwf.breaks <- get.mwf.breaks(dat)
 
 		# component.breaks <- apply(dat[status == 1, .(
 		# 	bio,
@@ -527,19 +396,10 @@ get.coxph <- function(
 		# component.breaks <- as.data.table(component.breaks)
 
 		# Make categorical variables ####
-		get.cut <- function(x, breaks, y = NULL, include.lowest = T, dig.lab = 4) {
-			if (is.null(y)) {y <- deparse(substitute(x))}
-			cut(
-				x,
-				unlist(unique(na.exclude(breaks[, y, with = F]))),
-				include.lowest = include.lowest,
-				dig.lab = dig.lab
-			)
-		}
 		dat[, `:=`(
 			Year = get.cut(year, covariate.breaks),
 			`Year of hire` = get.cut(yin.gm, covariate.breaks, "yin"),
-			`Duration of employment` = get.cut(`Employment years`, covariate.breaks),
+			`Duration of employment` = get.cut(employment.years, covariate.breaks),
 			Age = get.cut(age.year2 / 365, covariate.breaks, "age"),
 			Straight = get.cut(straight, mwf.breaks, dig.lab = 3),
 			Soluble = get.cut(soluble, mwf.breaks, "soluble5", dig.lab = 3),
@@ -596,6 +456,9 @@ get.coxph <- function(
 				inherits = T,
 				envir = .GlobalEnv)
 			Sys.sleep(0)
+		}} else {
+			dat <- get(paste0(code, ifelse(!hwse3, ".", ""), "dat", ifelse(hwse2, 2, ifelse(hwse3, 3, ""))),
+								 envir = .GlobalEnv)
 		}
 
 		# Get data to impute
@@ -1563,14 +1426,14 @@ get.coef <- function(
 			if (!hwse2 & !hwse3) {
 				if (!(paste0(code, ".dat") %in% ls(envir = .GlobalEnv)) | new_dat |
 						(!(paste0(gsub(" ", "_", code), ".mi_race.M", mi) %in% ls(envir = .GlobalEnv)) & mi > 0)) {
-					get.coxph(cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag, age_under = age_under)
+					get.coxph(cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag, age_under = age_under, mi = mi)
 				}
 				dat.og <- data.table::copy(get(paste0(code, ".dat")))
 			} else  if (hwse2) {
 				if (!(paste0(code, ".dat2") %in% ls(envir = .GlobalEnv)) | new_dat |
 						(!(paste0(gsub(" ", "_", code), ".mi_race.M", mi, ".hwse2") %in% ls(envir = .GlobalEnv)) & mi > 0)) {
 					get.hwse2.coxph(
-						cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag, employment_status.lag = employment_status.lag, year.max = year.max, age_under = age_under)}
+						cohort_name = cohort_name, run_model = F, outcomes = i, additional.lag = additional.lag, employment_status.lag = employment_status.lag, year.max = year.max, age_under = age_under, mi = mi)}
 				dat.og <- data.table::copy(get(paste0(code, ".dat2")))
 			} else if (hwse3) {
 				if (!("dat3" %in% ls(envir = .GlobalEnv)) | new_dat |
@@ -1578,7 +1441,7 @@ get.coef <- function(
 					get.hwse3.coxph(cohort_name = cohort_name, run_model = F, additional.lag = additional.lag,
 													employment_status.lag = employment_status.lag,
 													year.max = year.max, start.year = start.year,
-													age_under = age_under)
+													age_under = age_under, mi = mi)
 				}
 				dat.og <- data.table::copy(get("dat3"))
 			}
@@ -1605,7 +1468,7 @@ get.coef <- function(
 										 ifelse(hwse2, paste0(" and leaving work (", employment.which, ")"), "")))
 			pb <- txtProgressBar(min = 0, max = mi, style = 3)
 		}
-		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 0) {
+		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 1) {
 
 			if (is.null(mod.name)) {
 				mod.name <- paste0(
@@ -1755,7 +1618,7 @@ get.coef <- function(
 			# Pretty covariate/level ####
 			tmp.coef <- rbindlist(lapply(
 				covariates[which(covariates != "(Intercept)")],
-				function(x = covariates[4]) {
+				function(x = covariates[6]) {
 					# Get relevant rows
 					dat <- tmp.coef[grep(paste0(x, "$"), tmp.coef$Covariate), ]
 
@@ -1792,10 +1655,10 @@ get.coef <- function(
 						} else if (grepl("Year|Age|Duration", x)) {
 							ref.lower <- ifelse(
 								grepl("Year$", x),
-								1973,
+								min(dat.og[immortal == 0]$year),
 								ifelse(
 									grepl("hire$", x),
-									1938,
+									min(floor(dat.og[immortal == 0]$yin.gm)),
 									ifelse(
 										grepl("Age", x),
 										floor(min(dat.og[immortal == 0]$age.year2) / 365),
@@ -1873,10 +1736,10 @@ get.coef <- function(
 						} else if (grepl("Year|Age|Duration", x)) {
 							ref.lower <- ifelse(
 								grepl("Year$", x),
-								1973,
+								min(dat.og[immortal == 0]$year),
 								ifelse(
 									grepl("hire$", x),
-									1938,
+									min(floor(dat.og[immortal == 0]$yin.gm)),
 									ifelse(
 										grepl("Age", x),
 										floor(min(dat.og[immortal == 0]$age.year2) / 365),

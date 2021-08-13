@@ -12,10 +12,11 @@ set.seed(03032021)
 # outcomes.which <- c(3, 4, 6:8, 10:12, 15, 18, 19, 21, 25, 31, 32)
 # Specify YOUT ####
 yout.which <- "yout"
-race.imputed.melt <- NULL
+# race.imputed.melt <- NULL
 fix_discrepancies <- T
 hwse_age_under <- 75
 source(here::here("get-data.R"))
+source(here("breaks.R"))
 source(here::here("incidence.R"))
 employment_status.lag <- c(1)
 additional.lag <- c(0)
@@ -44,9 +45,9 @@ incidence.key[outcomes.which,]
 # 						jobloss.date := new_yout[id == studyno]$jobloss.date,
 # 						studyno]
 
-# Unknown race as separate category ####
-cohort_analytic[finrace %in% c(0, 9), race := "Unknown"]
-cohort2[finrace %in% c(0, 9), race := "Unknown"]
+# Unknown race as separate category? ####
+cohort_analytic[finrace %in% c(0, 9), race := "White"]
+cohort2[finrace %in% c(0, 9), race := "White"]
 
 # Filter ####
 cohort_analytic <- cohort_analytic[wh == 1 & nohist == 0]
@@ -136,16 +137,16 @@ get.coxph(
 	run_model = T,
 	spline_year = F,
 	spline_yin = F,
-	time_scale = "age"
-	# mi = 50,
+	time_scale = "age",
+	mi = 50
 )
 get.coef(
 	outcomes = outcomes.which,
 	new_dat = F,
 	time_scale = "age",
 	spline_year = F,
-	spline_yin = F
-	# mi = 50,
+	spline_yin = F,
+	mi = 50
 )
 
 # rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
@@ -209,7 +210,7 @@ get.coef(
 # Figures ####
 # MWF-outcome HRs ####
 str.ggtab <- rbindlist(get.ggtab(
-	# mi = 50
+	mi = 50
 ))
 str.ggtab[,`:=`(I = .N:1)]
 og_str.ggtab <- as.data.table(as.data.frame(str.ggtab))
@@ -218,8 +219,8 @@ str.ggtab <- str.ggtab[
 ]
 
 sol.ggtab <- rbindlist(get.ggtab(
-	"Soluble"
-	# mi = 50
+	"Soluble",
+	mi = 50
 	))
 sol.ggtab[,`:=`(I = .N:1)]
 og_sol.ggtab <- as.data.table(as.data.frame(sol.ggtab))
@@ -228,8 +229,8 @@ sol.ggtab <- sol.ggtab[
 ]
 
 syn.ggtab <- rbindlist(get.ggtab(
-	"Synthetic"
-	# mi = 50
+	"Synthetic",
+	mi = 50
 	))
 syn.ggtab[,`:=`(I = .N:1)]
 og_syn.ggtab <- as.data.table(as.data.frame(syn.ggtab))
@@ -241,7 +242,7 @@ syn.ggtab <- syn.ggtab[
 get.tikz(
 	ggtab.prefix = c("str", "sol", "syn"),
 	file.prefix = paste0(c("str_sol5", "sol_sol5", "syn_sol5"),
-											 # ".M50"
+											 ".M50"
 											 NULL),
 	directory = here::here(paste0(
 		"./reports/resources/",
@@ -249,7 +250,7 @@ get.tikz(
 	)
 lualatex(pattern = paste0(
 	"*sol5",
-	# "\\.M50",
+	"\\.M50",
 	"\\.tex"),
 	directory = here::here(paste0(
 		"./reports/resources/",

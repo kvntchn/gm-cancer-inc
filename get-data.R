@@ -154,9 +154,9 @@ Sys.sleep(0)
 if (get.cohort2 | !("cohort2" %in% ls())) {
 
 	cohort2 <- cohort2[
-		wh == 1 & nohist == 0,
+		wh == 1 & nohist == 0 &
 			# cancinccoh15_new == 1 &
-			possdiscr_new == 0,
+			possdiscr_new == 0
 		# & immortal == 0 & right.censored == 0
 		,
 		col.names, with = F]
