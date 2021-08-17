@@ -242,7 +242,7 @@ syn.ggtab <- syn.ggtab[
 get.tikz(
 	ggtab.prefix = c("str", "sol", "syn"),
 	file.prefix = paste0(c("str_sol5", "sol_sol5", "syn_sol5"),
-											 ".M50"
+											 ".M50",
 											 NULL),
 	directory = here::here(paste0(
 		"./reports/resources/",
