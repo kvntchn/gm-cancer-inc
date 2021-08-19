@@ -20,7 +20,20 @@ source(here("breaks.R"))
 source(here::here("incidence.R"))
 employment_status.lag <- c(1)
 additional.lag <- c(0)
-outcomes.which <- grep("colon|^rectal|pancreatic|esophageal|stomach|laryn|lung|breast|prostate|kidney|bladder|melanom|^leuk|hodgkin|all cancers", incidence.key$description, ignore.case = T)
+
+incidence.key <- rbindlist(list(
+	incidence.key,
+	data.table(
+		code = "first_mort",
+		description = "All cancer mortality",
+		var.name = "All cancers",
+		date.name = "yod")
+))
+
+# outcomes.which <- grep("colon|^rectal|pancreatic|esophageal|stomach|laryn|lung|breast|prostate|kidney|bladder|melanom|^leuk|hodgkin|all cancers", incidence.key$description, ignore.case = T)
+
+outcomes.which <- grep("mort", incidence.key$description, ignore.case = T)
+
 
 # # Clean up environment a little
 # rm(cohort, dta, jobhist, jobhist_py, jobhist_py.cast, exposure)
@@ -54,6 +67,7 @@ cohort_analytic <- cohort_analytic[wh == 1 & nohist == 0]
 cohort2 <- cohort2[wh == 1 & nohist == 0]
 mortality.cohort2 <- copy(cohort2)
 cohort2_85 <- cohort2[year >= 1985]
+cohort2_38 <- cohort2[yin.gm >= 1938]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # # Get race model ####
@@ -134,6 +148,7 @@ cohort2_85 <- cohort2[year >= 1985]
 # MWF-Cancer with Messy soluble ####
 get.coxph(
 	outcomes = outcomes.which,
+	cohort_name = "cohort2_38",
 	run_model = T,
 	spline_year = F,
 	spline_yin = F,
@@ -142,6 +157,7 @@ get.coxph(
 )
 get.coef(
 	outcomes = outcomes.which,
+	cohort_name = "cohort2_38",
 	new_dat = F,
 	time_scale = "age",
 	spline_year = F,

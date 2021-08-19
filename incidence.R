@@ -90,7 +90,7 @@ get.coxph <- function(
 		if (is.null(cohort_name)) {
 			if (hwse3 | hwse2) {
 				cohort_name <- "cohort2"
-				if (i %in% which(grepl("copd|external", incidence.key$code))) {
+				if (i %in% which(grepl("copd|external|mort", incidence.key$code))) {
 					cohort_name <- "mortality.cohort2"
 				}
 			} else {
@@ -191,7 +191,7 @@ get.coxph <- function(
 		# If looking at mortality outcome, no need to start FU later
 		if (is.null(start.year)) {
 			if (#F # No more FU starting in 1941
-				hwse3 | i %in% which(grepl("copd|external", incidence.key$code))
+				hwse3 | i %in% which(grepl("copd|external|mort", incidence.key$code))
 			) {
 				dat$start.year <- 1941} else if (
 					# If looking at cancer incidence, should use 1973 or 1985
@@ -207,7 +207,7 @@ get.coxph <- function(
 
 		if (!hwse3 & nrow(dat[
 			plant == 3 &
-			!i %in% which(grepl("copd|external", incidence.key$code)) &
+			!i %in% which(grepl("copd|external|mort", incidence.key$code)) &
 			year < 1985]) > 0) {
 			message("Cancer incidence FU for plant 3 before 1985?")}
 
@@ -1452,7 +1452,7 @@ get.coef <- function(
 			if (grepl("breast|^female", description, ignore.case = T)) {
 				dat.og <- dat.og[Sex == "Female"]
 			}
-		} else {dat.og <- get(analytic.name)}
+		} else {dat.og <- copy(analytic.name)}
 
 		dat <- data.table::copy(dat.og)
 
@@ -1468,7 +1468,7 @@ get.coef <- function(
 										 ifelse(hwse2, paste0(" and leaving work (", employment.which, ")"), "")))
 			pb <- txtProgressBar(min = 0, max = mi, style = 3)
 		}
-		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 1) {
+		tmp.coef <- lapply(if (mi == 0) {0} else {1:mi}, function(m = 0) {
 
 			if (is.null(mod.name)) {
 				mod.name <- paste0(
@@ -1618,7 +1618,7 @@ get.coef <- function(
 			# Pretty covariate/level ####
 			tmp.coef <- rbindlist(lapply(
 				covariates[which(covariates != "(Intercept)")],
-				function(x = covariates[6]) {
+				function(x = covariates[1]) {
 					# Get relevant rows
 					dat <- tmp.coef[grep(paste0(x, "$"), tmp.coef$Covariate), ]
 
@@ -1627,7 +1627,7 @@ get.coef <- function(
 					upper <- dat$upper
 					if (!hwse2) {
 						# Pretty levels Exposure-outcome ####
-						if (grepl("Cumu", x)) {
+						if (grepl("Cumu|Str|Sol|Syn", x)) {
 							level <- paste0("$>", lower, "$ to $", upper, "$")
 							level[grep("Inf", upper)] <-
 								paste0("$>", lower[grep("Inf", upper)], "$")
@@ -1645,7 +1645,7 @@ get.coef <- function(
 						dat$level <- level
 
 						# Get referent level
-						if (grepl("Cumu", x)) {
+						if (grepl("Cumu|Str|Sol|Syn", x)) {
 							ref.lower <- -Inf
 							ref.upper <- min(as.numeric(lower))
 							ref.level <-

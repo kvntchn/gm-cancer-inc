@@ -133,6 +133,7 @@ if (!('cohort_analytic' %in% ls())) {
 		"yout_recode",
 		"jobloss.date",
 		"All causes",
+		"All cancers",
 		"Chronic obstructive pulmonary disease",
 		"All external causes",
 		"nohist", "wh", "immortal", "right.censored",
