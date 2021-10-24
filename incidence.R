@@ -66,7 +66,8 @@ get.coxph <- function(
 	year.max = 2015,
 	start_m = 1,
 	mi = 0,
-	age_under = Inf) {
+	age_under = Inf,
+	formula.append = "") {
 
 	# start time
 	start <- Sys.time()
@@ -404,6 +405,7 @@ get.coxph <- function(
 			Straight = get.cut(straight, mwf.breaks, dig.lab = 3),
 			Soluble = get.cut(soluble, mwf.breaks, "soluble5", dig.lab = 3),
 			Synthetic =  get.cut(synthetic, mwf.breaks, dig.lab = 3),
+			`Synthetic 01` = get.cut(synthetic, mwf.breaks, "synthetic01", dig.lab = 3),
 			`Time off` =  get.cut(off, mwf.breaks, dig.lab = 3),
 			`Cumulative straight` = get.cut(cum_straight, mwf.breaks, dig.lab = 3),
 			`Cumulative soluble` = get.cut(cum_soluble, mwf.breaks, dig.lab = 3),
@@ -411,6 +413,7 @@ get.coxph <- function(
 			`Cumulative soluble 127` = get.cut(cum_soluble, mwf.breaks, "cum_soluble127", dig.lab = 3),
 			`Cumulative soluble 10` = get.cut(cum_soluble, mwf.breaks, "cum_soluble11", dig.lab = 3),
 			`Cumulative synthetic` = get.cut(cum_synthetic, mwf.breaks, dig.lab = 3),
+			`Cumulative synthetic 01` = get.cut(cum_synthetic, mwf.breaks, "cum_synthetic01", dig.lab = 3),
 			`Cumulative time off` =  get.cut(cum_off, mwf.breaks, dig.lab = 3)
 			# Biocide = get.cut(bio, component.breaks, dig.lab = 3),
 			# Chlorine = get.cut(cl, component.breaks, dig.lab = 3),
@@ -529,7 +532,8 @@ get.coxph <- function(
 						),
 						ifelse(!spline_yin, "`Year of hire` + ", paste0("pspline(yin.gm, df = ", yin.df, ") +")),
 						"Race + Plant",
-						ifelse(!grepl('breast|male|prostate', description, ignore.case = T), "+ Sex", "")
+						ifelse(!grepl('breast|male|prostate', description, ignore.case = T), "+ Sex", ""),
+						formula.append
 					)
 				),
 				data = {
@@ -1452,7 +1456,7 @@ get.coef <- function(
 			if (grepl("breast|^female", description, ignore.case = T)) {
 				dat.og <- dat.og[Sex == "Female"]
 			}
-		} else {dat.og <- copy(analytic.name)}
+		} else {dat.og <- copy(get(analytic.name))}
 
 		dat <- data.table::copy(dat.og)
 
@@ -1618,7 +1622,7 @@ get.coef <- function(
 			# Pretty covariate/level ####
 			tmp.coef <- rbindlist(lapply(
 				covariates[which(covariates != "(Intercept)")],
-				function(x = covariates[1]) {
+				function(x = covariates[2]) {
 					# Get relevant rows
 					dat <- tmp.coef[grep(paste0(x, "$"), tmp.coef$Covariate), ]
 
@@ -1641,6 +1645,8 @@ get.coef <- function(
 							level <- levels(dat.og$Plant)[-1]
 						} else if (grepl("Sex", x)) {
 							level <- levels(dat.og$Sex)[-1]
+						} else if (grepl("Employment status", x)) {
+							level <- levels(dat.og$`Employment status`)[-1]
 						}
 						dat$level <- level
 
@@ -1679,6 +1685,11 @@ get.coef <- function(
 							ref.lower <- NA
 							ref.level <- "Male"
 							level <- levels(dat.og$Sex)[-1]
+						} else if (grepl("Employment status", x)) {
+							ref.upper <- NA
+							ref.lower <- NA
+							ref.level <- "At work"
+							level <- levels(dat.og$`Employment status`)[-1]
 						}
 					}
 

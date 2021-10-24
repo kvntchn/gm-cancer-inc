@@ -78,7 +78,7 @@ get.mwf.breaks <- function(dat) {
 		}),
 		apply(dat[status == 1, .(cum_soluble5 = cum_soluble,
 														 soluble5 = soluble)], 2, function(x) {
-														 	x <- x[x > 0]
+														 	x <- x[x > 0.05]
 														 	if (length(x) > 40) {
 														 		if (length(x) > 60) {
 														 			probs <- seq(0, 1, 1 / 3)
@@ -130,6 +130,26 @@ get.mwf.breaks <- function(dat) {
 															 		breaks <- c(-Inf, breaks)
 															 	} else {
 															 		breaks <- c(-Inf, 0.11, Inf)
+															 	}
+															 	if (length(breaks) < 5) {
+															 		breaks <- c(breaks, rep(NA, 5 - length(breaks)))
+															 	}
+															 	breaks
+															 }),
+		apply(dat[status == 1, .(cum_synthetic01 = cum_synthetic,
+															 synthetic01 = synthetic)], 2, function(x) {
+															 	x <- x[x > 0.0015]
+															 	if (length(x) > 40) {
+															 		if (length(x) > 60) {
+															 			probs <- seq(0, 1, 1 / 3)
+															 		} else {
+															 			probs <- seq(0, 1, 1 / 2)
+															 		}
+															 		breaks <- quantile(x[x > 0], probs)
+															 		breaks[c(1, length(probs))] <- c(0.0015, Inf)
+															 		breaks <- c(-Inf, breaks)
+															 	} else {
+															 		breaks <- c(-Inf, 0.0015, Inf)
 															 	}
 															 	if (length(breaks) < 5) {
 															 		breaks <- c(breaks, rep(NA, 5 - length(breaks)))
