@@ -30,6 +30,23 @@ geometry: margin=2.54cm
 \fancyhead[L]{Cancer incidence (including SEER data)}
 \renewcommand{\headrulewidth}{0pt}
 
+```{r, echo=F}
+exposure.lag <- 21
+employment_status.lag <- 1
+hwse3.additional.lag <- 0
+hwse2.additional.lag <- 0
+spline_yin <- T
+spline_year <- T
+time_scale <- "age"
+hwse2.time_scale <- "age"
+table.engine <- "xtable"
+messy_sol <- 0.05
+mi <- 0
+hwse_age_under <- 75
+hwse_age_under <- Inf
+```
+
+
 This packet summarizes Cox proportional hazard model results relating cumulative exposure to straight, soluble, and synthetic metalworking fluids (MWF), lagged 21 years, to cancer incidence of 14 types and for all sites combined (includes types not shown here) in the UAW-GM Cohort.
 
 \begin{multicols}{2}
@@ -55,23 +72,8 @@ In addition, path analyses for evidence of the healthy worker survivor effect ar
 
 The study population, summarized in Table \ref{tab:tab1}, included subjects from the UAW-GM Cohort who were still alive at the start of cancer incidence follow-up. Cancer incidence data were abstracted from Michigan Cancer Registry for all plants from years 1985 onward. Cancer incidence data for plants 1 and 2 were supplemented with data from the Surveillance, Epidemiology, and End Results Program (SEER).
 
-In all analyses, follow-up began three years after hire and no earlier than 1973 for plants 1 and 2 or 1985 for plant 3; follow-up ended upon experiencing the outcome of interest, attaining the oldest observed age at death (considered lost to follow-up), dying, or reaching the year 2015, whichever came first. In path analyses involving employment status, follow-up ended on December 31, 1994 (end of employment records). Missing race was treated as a separate category.
+In all analyses, follow-up began three years after hire and no earlier than 1973 for plants 1 and 2 or 1985 for plant 3; follow-up ended upon experiencing the outcome of interest, attaining the oldest observed age at death (considered lost to follow-up), dying, or reaching the year 2015, whichever came first. In path analyses involving employment status, follow-up ended on December 31, `r 1994 + employment_status.lag`. Missing race was treated as a separate category.
 
-
-```{r, echo=F}
-exposure.lag <- 21
-employment_status.lag <- 1
-hwse3.additional.lag <- 0
-hwse2.additional.lag <- 0
-spline_yin <- T
-spline_year <- T
-time_scale <- "age"
-hwse2.time_scale <- "age"
-table.engine <- "xtable"
-messy_sol <- 0.05
-mi <- 0
-hwse_age_under <- 75
-```
 
 <!-- \fancyhead[R]{Exposure lagged `r exposure.lag` years} -->
 

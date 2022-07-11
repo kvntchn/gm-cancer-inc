@@ -12,14 +12,15 @@ set.seed(03032021)
 # outcomes.which <- c(3, 4, 6:8, 10:12, 15, 18, 19, 21, 25, 31, 32)
 # Specify YOUT ####
 yout.which <- "yout"
-# race.imputed.melt <- NULL
+race.imputed.melt <- F
 fix_discrepancies <- T
 hwse_age_under <- 75
 source(here::here("get-data.R"))
 source(here("breaks.R"))
 source(here::here("incidence.R"))
-employment_status.lag <- c(1)
+employment_status.lag <- c(0)
 additional.lag <- c(0)
+lazy_indexing <- F
 
 incidence.key <- rbindlist(list(
 	incidence.key,
@@ -30,9 +31,11 @@ incidence.key <- rbindlist(list(
 		date.name = "yod")
 ))
 
-# outcomes.which <- grep("colon|^rectal|pancreatic|esophageal|stomach|laryn|lung|breast|prostate|kidney|bladder|melanom|^leuk|hodgkin|all cancers", incidence.key$description, ignore.case = T)
+outcomes.which <- grep("colon|^rectal|pancreatic|esophageal|stomach|laryn|lung|breast|prostate|kidney|bladder|melanom|^leuk|hodgkin|all cancers", incidence.key$description, ignore.case = T)
+# outcomes.which <- grep("stomach", incidence.key$description, ignore.case = T)
+length(outcomes.which)
 
-outcomes.which <- grep("mort", incidence.key$description, ignore.case = T)
+# outcomes.which <- grep("mort", incidence.key$description, ignore.case = T)
 
 
 # # Clean up environment a little
@@ -40,34 +43,20 @@ outcomes.which <- grep("mort", incidence.key$description, ignore.case = T)
 
 incidence.key[outcomes.which,]
 
-# # New leaving work variable
-# cohort_analytic[, jobloss.date := gm.to.date(yout15[1]), studyno]
-# cohort2[, jobloss.date := gm.to.date(yout15[1]), studyno]
-#
-# # Tweak yout
-# new_yout <- cohort[yrout09_new < yout15, .(
-# 	id = studyno,
-# 	jobloss.date = gm.to.date(yrout09_new)
-# )]
-#
-# cohort_analytic[studyno %in% new_yout$studyno,
-# 						jobloss.date := new_yout[id == studyno]$jobloss.date,
-# 						studyno]
-#
-# cohort2[studyno %in% new_yout$studyno,
-# 						jobloss.date := new_yout[id == studyno]$jobloss.date,
-# 						studyno]
+# # Tweak yout (left consider left job if )
+# cohort_analytic[yod < jobloss.date, jobloss.date := yod]
+# cohort2[yod < jobloss.date, jobloss.date := yod]
 
 # Unknown race as separate category? ####
-cohort_analytic[finrace %in% c(0, 9), race := "White"]
-cohort2[finrace %in% c(0, 9), race := "White"]
+cohort_analytic[finrace %in% c(0, 9), race := "Unknown"]
+cohort2[finrace %in% c(0, 9), race := "Unknown"]
 
 # Filter ####
 cohort_analytic <- cohort_analytic[wh == 1 & nohist == 0]
 cohort2 <- cohort2[wh == 1 & nohist == 0]
-mortality.cohort2 <- copy(cohort2)
-cohort2_85 <- cohort2[year >= 1985]
-cohort2_38 <- cohort2[yin.gm >= 1938]
+# mortality.cohort2 <- copy(cohort2)
+# cohort2_85 <- cohort2[year >= 1985]
+# cohort2_38 <- cohort2[yin.gm >= 1938]
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # # Get race model ####
@@ -145,294 +134,332 @@ cohort2_38 <- cohort2[yin.gm >= 1938]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Run models ####
-# MWF-Cancer with Messy soluble ####
-get.coxph(
-	outcomes = outcomes.which,
-	cohort_name = "cohort2_38",
-	run_model = T,
-	spline_year = F,
-	spline_yin = F,
-	time_scale = "age",
-	mi = 50
-)
-get.coef(
-	outcomes = outcomes.which,
-	cohort_name = "cohort2_38",
-	new_dat = F,
-	time_scale = "age",
-	spline_year = F,
-	spline_yin = F,
-	mi = 50
-)
-
+# # MWF-Cancer with Messy soluble ####
+# get.coxph(
+# 	outcomes = outcomes.which,
+# 	cohort_name = "cohort2_38",
+# 	run_model = T,
+# 	spline_year = F,
+# 	spline_yin = F,
+# 	time_scale = "age",
+# 	mi = 50
+# )
+# get.coef(
+# 	outcomes = outcomes.which,
+# 	cohort_name = "cohort2_38",
+# 	new_dat = F,
+# 	time_scale = "age",
+# 	spline_year = F,
+# 	spline_yin = F,
+# 	mi = 50
+# )
+#
 # rm(list = ls()[grepl("dat$", ls())]); Sys.sleep(0)
 
-# # HWSE 2 with Messy soluble ####
-# get.hwse2.coxph(
-# 	outcomes = outcomes.which,
-# 	run_model = T,
-# 	spline_year = T,
-# 	year.df = 3,
-# 	spline_yin = T,
-# 	yin.df = 3,
-# 	time_scale = "age",
-# 	additional.lag = additional.lag,
-# 	employment_status.lag = employment_status.lag,
-# 	year.max = 1994,
-# 	age_under = hwse_age_under
-# 	# lazy_indexing = T,
-# 	# mi = 50,
-# )
-# for (x in c("Binary", paste("Age", seq(50, 60, 5)))) {
-# 	get.coef(
-# 		outcomes = outcomes.which,
-# 		new_dat = F,
-# 		time_scale = "age",
-# 		employment.which = x,
-# 		spline_year = T,
-# 		spline_yin = T,
-# 		hwse2 = T,
-# 		additional.lag = additional.lag,
-# 		employment_status.lag = employment_status.lag,
-# 		year.max = 1994,
-# 		age_under = hwse_age_under
-# 		# mi = 50,
-# 	)
-# }
-#
-# #  HWSE 3 with Messy soluble ####
-# get.hwse3.coxph(
-# 	run_model = T,
-# 	additional.lag = additional.lag,
-# 	employment_status.lag = employment_status.lag,
-# 	spline_year = T,
-# 	year.df = 3,
-# 	year.max = 1994,
-# 	age_under = hwse_age_under
-# 	# mi = 50
-# )
-# get.coef(hwse3 = T,
-# 				 additional.lag = additional.lag,
-# 				 employment_status.lag = employment_status.lag,
-# 				 new_dat = F,
-# 				 spline_year = T,
-# 				 year.max = 1994,
-# 				 age_under = hwse_age_under
-# 				 # mi = 50
-# )
+# HWSE 2 with Messy soluble ####
+get.hwse2.coxph(
+	outcomes = outcomes.which,
+	run_model = T,
+	spline_year = T,
+	year.df = 3,
+	spline_yin = T,
+	yin.df = 3,
+	time_scale = "age",
+	additional.lag = additional.lag,
+	employment_status.lag = employment_status.lag,
+	year.max = 1994,
+	age_under = hwse_age_under,
+	lazy_indexing = lazy_indexing,
+	# mi = 50,
+)
+for (x in c("Binary", paste("Age", seq(50, 60, 5)))) {
+	# x = "Binary"
+	get.coef(
+		outcomes = outcomes.which,
+		new_dat = F,
+		time_scale = "age",
+		employment.which = x,
+		spline_year = T,
+		spline_yin = T,
+		hwse2 = T,
+		additional.lag = additional.lag,
+		employment_status.lag = employment_status.lag,
+		year.max = 1994,
+		age_under = hwse_age_under,
+		lazy_indexing = lazy_indexing,
+		# mi = 50,
+	)
+}
+
+#  HWSE 3 with Messy soluble ####
+get.hwse3.coxph(
+	run_model = T,
+	additional.lag = additional.lag,
+	employment_status.lag = employment_status.lag,
+	spline_year = T,
+	include_yin = T,
+	spline_yin = T,
+	year.df = 0,
+	year.max = 1994,
+	age_under = hwse_age_under
+	# mi = 50
+)
+get.coef(hwse3 = T,
+				 additional.lag = additional.lag,
+				 employment_status.lag = employment_status.lag,
+				 new_dat = F,
+				 spline_year = T,
+				 spline_yin = T,
+				 year.max = 1994,
+				 age_under = hwse_age_under
+				 # mi = 50
+)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Figures ####
-# MWF-outcome HRs ####
-str.ggtab <- rbindlist(get.ggtab(
-	mi = 50
-))
-str.ggtab[,`:=`(I = .N:1)]
-og_str.ggtab <- as.data.table(as.data.frame(str.ggtab))
-str.ggtab <- str.ggtab[
-	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
-]
-
-sol.ggtab <- rbindlist(get.ggtab(
-	"Soluble",
-	mi = 50
-	))
-sol.ggtab[,`:=`(I = .N:1)]
-og_sol.ggtab <- as.data.table(as.data.frame(sol.ggtab))
-sol.ggtab <- sol.ggtab[
-	!(grepl("^0|^\\$0", level) | level == "0 to 0.05" | is.na(level) | level == ""),
-]
-
-syn.ggtab <- rbindlist(get.ggtab(
-	"Synthetic",
-	mi = 50
-	))
-syn.ggtab[,`:=`(I = .N:1)]
-og_syn.ggtab <- as.data.table(as.data.frame(syn.ggtab))
-syn.ggtab <- syn.ggtab[
-	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
-]
-
-# Compile figure ####
-get.tikz(
-	ggtab.prefix = c("str", "sol", "syn"),
-	file.prefix = paste0(c("str_sol5", "sol_sol5", "syn_sol5"),
-											 ".M50",
-											 NULL),
-	directory = here::here(paste0(
-		"./reports/resources/",
-		"Lag ", exposure.lag))
-	)
-lualatex(pattern = paste0(
-	"*sol5",
-	"\\.M50",
-	"\\.tex"),
-	directory = here::here(paste0(
-		"./reports/resources/",
-		"Lag ", exposure.lag)))
-
-# # HWSE 2 HRs ####
-# 	og_hwse.ggtab <- rbindlist(get.hwse.ggtab(
-# 		outcomes = outcomes.which,
-# 		# # Change messy_sol for clean soluble referent group
-# 		# messy_sol = 0.05,
-# 		time_scale = "age",
-# 		additional.lag = additional.lag,
-# 		employment_status.lag = employment_status.lag,
-# 		# mi = 50,
-# 		spline_year = T,
-# 		spline_yin = T
-# 		))
-# 	og_hwse.ggtab[,`:=`(I = .N:1)]
-# 	hwse.ggtab <- data.table::copy(og_hwse.ggtab)
+# # Figures ####
+# # MWF-outcome HRs ####
+# str.ggtab <- rbindlist(get.ggtab(
+# 	mi = 50
+# ))
+# str.ggtab[,`:=`(I = .N:1)]
+# og_str.ggtab <- as.data.table(as.data.frame(str.ggtab))
+# str.ggtab <- str.ggtab[
+# 	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
+# ]
 #
-# 	hwse.ggtab[grepl("Still", level), `:=`(ci.lower = 1, ci.upper = 1)]
-# 	hwse.ggtab[grepl("any", level), level := gsub("At any age", "Left work", level)]
+# sol.ggtab <- rbindlist(get.ggtab(
+# 	"Soluble",
+# 	mi = 50
+# 	))
+# sol.ggtab[,`:=`(I = .N:1)]
+# og_sol.ggtab <- as.data.table(as.data.frame(sol.ggtab))
+# sol.ggtab <- sol.ggtab[
+# 	!(grepl("^0|^\\$0", level) | level == "0 to 0.05" | is.na(level) | level == ""),
+# ]
 #
-# 	hwse.ggtab <- hwse.ggtab[
-# 		!(#grepl("Still", level) |
-# 			is.na(level) | level == ""),
-# 	]
+# syn.ggtab <- rbindlist(get.ggtab(
+# 	"Synthetic",
+# 	mi = 50
+# 	))
+# syn.ggtab[,`:=`(I = .N:1)]
+# og_syn.ggtab <- as.data.table(as.data.frame(syn.ggtab))
+# syn.ggtab <- syn.ggtab[
+# 	!(grepl("^0|^\\$0", level) | is.na(level) | level == ""),
+# ]
 #
-# 	hwse.ggtab <- hwse.ggtab[!grepl(" 50| 55| 60", level)]
-# 	hwse.ggtab <- hwse.ggtab[,.(
-# 		level = c(NA, level),
-# 		HR = c(NA, HR),
-# 		ci.lower = c(NA, ci.lower),
-# 		ci.upper = c(NA, ci.upper),
-# 		cases = c(NA, cases),
-# 		I = NA
-# 	), by = .(Outcome)]
-#
-# 	hwse.ggtab[,`:=`(I = .N:1)]
-# 	hwse.ggtab <- hwse.ggtab[!is.na(level)]
-#
-# 	# Compile for HWSE 2 ####
-# 	get.tikz(ggtab.prefix = "hwse",
-# 					 file.prefix = paste0("hwse_sol5",
-# 					 										 # ".M50"
-# 					 										 NULL),
-# 					 directory = here::here(paste0(
-# 					 	"./reports/resources/",
-# 					 	# "garcia yout/",
-# 					 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
-# 					 	"hwse 2/",
-# 					 	"FU through 1994/",
-# 					 	# "FU 1985 through 1994/",
-# 					 	"Lag ", 1 + additional.lag,
-# 					 	"/indexed by age"
-# 					 )))
-# 	lualatex(pattern = "*\\.tex",
-# 					 directory = here::here(paste0(
-# 					 	"./reports/resources/",
-# 					 	# "garcia yout/",
-# 					 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
-# 					 	"hwse 2/",
-# 					 	"FU through 1994/",
-# 					 	# "FU 1985 through 1994/",
-# 					 	"Lag ", 1 + additional.lag,
-# 					 	"/indexed by age")))
-#
-# # Selected outcomes ####
-# hwse.ggtab.selected <- hwse.ggtab[
-# 	as.vector(sapply(c("All cancers", "Prostate", "Lung", "Colon", "Stomach"),
-# 				 grep, Outcome))]
-# hwse.ggtab.selected[,`:=`(I = 1:.N)]
-# hwse.ggtab.selected[, Outcome := gsub(" cancer.*", "", Outcome)]
-# hwse.ggtab.selected[grepl("Lung", Outcome), Outcome := "Lung and\nbronchial"]
-# hwse.ggtab.selected[,`:=`(
-# 	n = {
-# 		paren1.where <- unlist(gregexpr("\\(", level))
-# 		paren2.where <- unlist(gregexpr(" cases\\)", level))
-# 		as.numeric(substr(level, paren1.where + 1, paren2.where - 1))
-# 		},
-# 	level = gsub(" \\(.*", "", level)
-# )]
-#
-# label.ggtab <- hwse.ggtab.selected[,.(
-# 	I.median = median(I[!grepl("Still at work", level)])
-# ), Outcome]
-#
-# ggplot(hwse.ggtab.selected[!grepl("Still at work", level)], aes(
-# 	x = I, y = as.numeric(HR),
-# 	ymin = as.numeric(ci.lower), ymax = as.numeric(ci.upper),
-# 	shape = level)) +
-# 	geom_pointrange(size = 0.5) +
-# 	geom_hline(yintercept = 1, linetype = 2, size = 0.5, color = "grey") +
-# 	scale_y_continuous(breaks = seq(0.5, 3, 0.5), trans = "log") +
-# 	scale_x_continuous(breaks = label.ggtab$I.median,
-# 										 labels = label.ggtab$Outcome) +
-# 	labs(shape = "Age at leaving work ",
-# 			 x = "Cancer type", y = "HR") +
-# 	mytheme + theme(
-# 		panel.grid = element_blank(),
-# 		legend.position = "bottom"
-# 	) + guides(shape = guide_legend(nrow = 2, byrow = TRUE)) -> hwse2.ggplot
-#
-# hwse2.ggplot
-#
-# # Compile for HWSE 2 (selected outcomes) ####
-# tikz(here::here(
-# 	paste0("reports/resources/",
-# 	# "garcia yout/",
-# 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
-# 	"hwse 2/",
-# 	"FU through 1994/",
-# 	# "FU 1985 through 1994/",
-# 	"Lag 1/",
-# 	"indexed by age"),
-# 	"hwse2_selected.tex"), standAlone = T, width = 4, height = 3.5)
-# print(hwse2.ggplot)
-# dev.off()
-#
-# lualatex(pattern = "hwse2_selected\\.tex",
-# 				 directory = here::here(
-# 	paste0("reports/resources/",
-# 				 # "garcia yout/",
-# 				 ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
-# 				 "hwse 2/",
-# 				 "FU through 1994/",
-# 				 # "FU 1985 through 1994/",
-# 				 "Lag 1/",
-# 				 "indexed by age")))
-
-# Facet view ####
-get.facet_tikz(
-	ggtab.prefix = c("str", "sol", "syn"),
-	file.prefix = paste0(c("str_sol5", "sol_sol5", "syn_sol5"),
-											 # ".M50"
-											 NULL),
-	directory = here::here(paste0("./reports/resources/",
-																"Lag ", exposure.lag)))
-
-# get.facet_tikz(
-# 	ggtab.prefix = "hwse",
-# 	file.prefix = paste0("hwse_sol5",
-# 											 # ".M50"
+# # Compile figure ####
+# get.tikz(
+# 	ggtab.prefix = c("str", "sol", "syn"),
+# 	file.prefix = paste0(c("str_sol5", "sol_sol5", "syn_sol5"),
+# 											 ".M50",
 # 											 NULL),
 # 	directory = here::here(paste0(
 # 		"./reports/resources/",
-# 		# "garcia yout/",
-# 		ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
-# 		"hwse 2/",
-# 		"FU through 1994/",
-# 		# "FU 1985 through 1994/",
-# 		"Lag ", 1 + additional.lag,
-# 		"/indexed by age"
-# 	)))
+# 		"Lag ", exposure.lag))
+# 	)
+# lualatex(pattern = paste0(
+# 	"*sol5",
+# 	"\\.M50",
+# 	"\\.tex"),
+# 	directory = here::here(paste0(
+# 		"./reports/resources/",
+# 		"Lag ", exposure.lag)))
+#
+# HWSE 2 HRs ####
+og_hwse.ggtab <- rbindlist(get.hwse.ggtab(
+	outcomes = outcomes.which,
+	# Change messy_sol for clean soluble referent group
+	messy_sol = 0.05,
+	time_scale = "age",
+	additional.lag = additional.lag,
+	employment_status.lag = employment_status.lag,
+	# mi = 50,
+	spline_year = T,
+	spline_yin = T,
+	year.max = 1994,
+	age_under = hwse_age_under,
+	lazy_indexing = lazy_indexing
+))
+og_hwse.ggtab[,`:=`(I = .N:1)]
 
-# Compile
-lualatex(pattern = "*facet\\.tex", directory = here::here(paste0(
-	"./reports/resources/",
-	"Lag ", exposure.lag)))
-# lualatex(pattern = "*facet\\.tex",
-# 				 directory = here::here(paste0(
-# 				 	"./reports/resources/",
-# 				 	# "garcia yout/",
-# 				 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
-# 				 	"hwse 2/",
-# 				 	"FU through 1994/",
-# 				 	# "FU 1985 through 1994/",
-# 				 	"Lag ", 1 + additional.lag,
-# 				 	"/indexed by age")))
+og_hwse.ggtab[grepl("Still", level), `:=`(ci.lower = 1, ci.upper = 1)]
+og_hwse.ggtab[grepl("any", level), level := gsub("At any age", "Left work", level)]
+
+og_hwse.ggtab <- og_hwse.ggtab[
+	!(#grepl("Still", level) |
+		is.na(level) | level == ""),
+]
+
+hwse.ggtab <- data.table::copy(og_hwse.ggtab)
+
+hwse.ggtab <- hwse.ggtab[!grepl("^50|^55|^60", level)]
+
+
+hwse.ggtab <- hwse.ggtab[,.(
+	level = c(NA, level),
+	HR = c(NA, HR),
+	ci.lower = c(NA, ci.lower),
+	ci.upper = c(NA, ci.upper),
+	cases = c(NA, cases),
+	I = NA
+), by = .(Outcome)]
+
+hwse.ggtab[,`:=`(I = .N:1)]
+hwse.ggtab <- hwse.ggtab[!is.na(level)]
+
+# Compile for HWSE 2 ####
+get.tikz(ggtab.prefix = "hwse",
+				 file.prefix = paste0("hwse_sol5",
+				 										 # ".M50"
+				 										 NULL),
+				 directory = here::here(paste0(
+				 	"./reports/resources/",
+				 	# "garcia yout/",
+				 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
+				 	"hwse 2/",
+				 	"FU through 1994/",
+				 	# "FU 1985 through 1994/",
+				 	"Lag ", 1 + additional.lag,
+				 	ifelse(employment_status.lag != 0,
+				 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
+				 				 ""),
+				 	"/indexed by age",
+				 	if (lazy_indexing) {"/left work for entire year"} else  {NULL}
+				 )),
+				 hr.min = 0.3, hr.max = 7)
+lualatex(pattern = "hwse_sol5\\.tex",
+				 directory = here::here(paste0(
+				 	"./reports/resources/",
+				 	# "garcia yout/",
+				 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
+				 	"hwse 2/",
+				 	"FU through 1994/",
+				 	# "FU 1985 through 1994/",
+				 	"Lag ", 1 + additional.lag,
+				 	ifelse(employment_status.lag != 0,
+				 				 paste0("/Employment status lagged ", employment_status.lag, " years"),
+				 				 ""),
+				 	"/indexed by age",
+				 	if (lazy_indexing) {"/left work for entire year"} else  {NULL})))
+
+# Selected outcomes ####
+hwse.ggtab.selected <- og_hwse.ggtab[
+	as.vector(sapply(c("All cancers", "Prostate", "Lung", "Colon", "Stomach"),
+									 grep, Outcome))]
+hwse.ggtab.selected[,`:=`(I = 1:.N)]
+hwse.ggtab.selected[, Outcome := gsub(" cancer.*", "", Outcome)]
+hwse.ggtab.selected[grepl("Lung", Outcome), Outcome := "Lung and\nbronchial"]
+hwse.ggtab.selected[,`:=`(
+	n = {
+		paren1.where <- unlist(gregexpr("\\(", level))
+		paren2.where <- unlist(gregexpr(" cases\\)", level))
+		as.numeric(substr(level, paren1.where + 1, paren2.where - 1))
+	},
+	level = gsub(" \\(.*", "", level)
+)]
+
+label.ggtab <- hwse.ggtab.selected[,.(
+	I.median = median(I[!grepl("Still at work", level)])
+), Outcome]
+
+ggplot(hwse.ggtab.selected[!grepl("Still at work", level)], aes(
+	x = I, y = as.numeric(HR),
+	ymin = as.numeric(ci.lower), ymax = as.numeric(ci.upper),
+	shape = level)) +
+	geom_pointrange(size = 0.5) +
+	geom_hline(yintercept = 1, linetype = 2, size = 0.5, color = "grey") +
+	scale_y_continuous(breaks = seq(0.5, 3, 0.5), trans = "log") +
+	scale_x_continuous(breaks = label.ggtab$I.median,
+										 labels = label.ggtab$Outcome) +
+	labs(shape = "Age at leaving work ",
+			 x = "Cancer type", y = "HR") +
+	mytheme + theme(
+		panel.grid = element_blank(),
+		legend.position = "bottom"
+	) + guides(shape = guide_legend(nrow = 2, byrow = TRUE)) -> hwse2.ggplot
+
+hwse2.ggplot
+
+# Compile for HWSE 2 (selected outcomes) ####
+tikz(here::here(
+	paste0("reports/resources/",
+				 # "garcia yout/",
+				 ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
+				 "hwse 2/",
+				 "FU through 1994/",
+				 # "FU 1985 through 1994/",
+				 "Lag ", 1 + additional.lag,
+				 ifelse(employment_status.lag != 0,
+				 			 paste0("/Employment status lagged ", employment_status.lag, " years"),
+				 			 ""),
+				 "/indexed by age",
+				 if (lazy_indexing) {"/left work for entire year"} else  {NULL}),
+	"hwse2_selected.tex"), standAlone = T, width = 4, height = 3.5)
+print(hwse2.ggplot)
+dev.off()
+
+lualatex(pattern = "hwse2_selected\\.tex",
+				 directory = here::here(
+				 	paste0("reports/resources/",
+				 				 # "garcia yout/",
+				 				 ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
+				 				 "hwse 2/",
+				 				 "FU through 1994/",
+				 				 # "FU 1985 through 1994/",
+				 				 "Lag ", 1 + additional.lag,
+				 				 ifelse(employment_status.lag != 0,
+				 				 			 paste0("/Employment status lagged ", employment_status.lag, " years"),
+				 				 			 ""),
+				 				 "/indexed by age",
+				 				 if (lazy_indexing) {"/left work for entire year"} else  {NULL})))
+
+# # Facet view ####
+# get.facet_tikz(
+# 	ggtab.prefix = c("str", "sol", "syn"),
+# 	file.prefix = paste0(c("str_sol5", "sol_sol5", "syn_sol5"),
+# 											 # ".M50"
+# 											 NULL),
+# 	directory = here::here(paste0("./reports/resources/",
+# 																"Lag ", exposure.lag)))
+#
+get.facet_tikz(
+	ggtab.prefix = "hwse",
+	file.prefix = paste0("hwse_sol5",
+											 # ".M50"
+											 NULL),
+	directory = here::here(paste0(
+		"./reports/resources/",
+		# "garcia yout/",
+		ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
+		"hwse 2/",
+		"FU through 1994/",
+		# "FU 1985 through 1994/",
+		"Lag ", 1 + additional.lag,
+		ifelse(employment_status.lag != 0,
+					 paste0("/Employment status lagged ", employment_status.lag, " years/"),
+					 ""),
+		"/indexed by age",
+		if (lazy_indexing) {"/left work for entire year"} else  {NULL}
+	)),
+	hr.min = 0.01, hr.max = 5.5,
+	width = 9, height = 6)
+
+# # Compile
+# lualatex(pattern = "*facet\\.tex", directory = here::here(paste0(
+# 	"./reports/resources/",
+# 	"Lag ", exposure.lag)))
+lualatex(pattern = "*facet\\.tex",
+				 directory = here::here(paste0(
+				 	"./reports/resources/",
+				 	# "garcia yout/",
+				 	ifelse(is.finite(hwse_age_under), paste0("under ", hwse_age_under, "/"), ""),
+				 	"hwse 2/",
+				 	"FU through 1994/",
+				 	# "FU 1985 through 1994/",
+				 	"Lag ", 1 + additional.lag,
+				 	ifelse(employment_status.lag != 0,
+				 				 paste0("/Employment status lagged ", employment_status.lag, " years/"),
+				 				 ""),
+				 	"/indexed by age",
+				 	if (lazy_indexing) {"/left work for entire year"} else  {NULL})))

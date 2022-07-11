@@ -35,7 +35,7 @@ if (!('cohort' %in% ls(envir = .GlobalEnv))) {
 
 # Getting posterior distribution for imputation ####
 if (!"race.imputed.melt" %in% ls()) {
-message("Loading posterior distribution for imputation...")
+	message("Loading posterior distribution for imputation...")
 	# race.imputed.melt <- box_read(ifelse(exposure.lag == 21, 780327112319, NaN))
 	box_load(ifelse(exposure.lag == 21, 783387319906, NaN))
 }
@@ -53,14 +53,19 @@ if (!('cohort_analytic' %in% ls())) {
 		use_seer = ifelse("use_seer" %in% ls(envir = .GlobalEnv), use_seer, T)
 	)
 	setorder(cohort_analytic, studyno, year)
-	cohort_analytic[, `:=`(yin.gm = date.to.gm(yin))]
 
 	# Keep only people who appear in the exposure data
 	if (!"restrict_by_exposure" %in% ls(envir = .GlobalEnv)) {
-		cohort_analytic <- cohort_analytic[studyno %in% unique(exposure$studyno)]
+		cohort_analytic <- cohort_analytic[
+			studyno %in% unique(exposure[
+				exposure[, !is.na(soluble) | !is.na(straight) | !is.na(synthetic)],
+				studyno])]
 	} else {
 		if (restrict_by_exposure) {
-			cohort_analytic <- cohort_analytic[studyno %in% unique(exposure$studyno)]
+			cohort_analytic <- cohort_analytic[
+				studyno %in% unique(exposure[
+					exposure[, !is.na(soluble) | !is.na(straight) | !is.na(synthetic)],
+					studyno])]
 		}
 	}
 
@@ -78,10 +83,10 @@ if (!('cohort_analytic' %in% ls())) {
 	# Exposure after leaving work is 0
 	cohort_analytic[year > (year(jobloss.date) + 1), (exposure.names):=0]
 	# NA fill
-	cohort_analytic[year <= (year(jobloss.date) + 1), (exposure.names):=lapply(exposure.names, function (x) {
-		x <- get(x)
-		return(zoo::na.locf(x))
-	}), by = .(studyno)]
+	cohort_analytic[year <= (year(jobloss.date) + 1), (exposure.names) := lapply(
+		exposure.names, function (x) {return(
+			zoo::na.locf(zoo::na.locf(get(x), na.rm = F), fromLast = T)
+			)}), by = .(studyno)]
 
 	# table(cohort_analytic[,.(N = length(table(jobloss.date))), by = .(studyno)]$N)
 
@@ -128,7 +133,8 @@ if (!('cohort_analytic' %in% ls())) {
 		"dateout.date",
 		"employment_end.date",
 		"employment_end.date.legacy",
-		"off", "cum_off",
+		"off", "cum_off",  "yrout09", "yrout09_new",
+		"yrout15", "yrout15_new",
 		"yout", "yout95", "yout15", "yout16",
 		"yout_recode",
 		"jobloss.date",
@@ -160,9 +166,9 @@ if (get.cohort2 | !("cohort2" %in% ls())) {
 			possdiscr_new == 0
 		# & immortal == 0 & right.censored == 0
 		,
-		col.names, with = F]
+		col.names[col.names %in% names(cohort2)], with = F]
 
-	cohort2[, (paste0("cum_", exposure.names)):=lapply(
+	cohort2[, (paste0("cum_", exposure.names)) := lapply(
 		exposure.names, function(x) {
 			x <- get(x)
 			return(cumsum(x))

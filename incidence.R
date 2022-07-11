@@ -100,369 +100,352 @@ get.coxph <- function(
 
 		if (get_dat) {
 
-		dat <- data.table::copy(get(cohort_name))
+			dat <- data.table::copy(get(cohort_name))
 
-		# Restrict age ####
-		if (is.finite(age_under)) {
-			# setorder(dat, studyno, age.year2)
-			# dat[,I := 1:.N, by = .(studyno)]
-			# include.who <- dat[age.year1/365 < age_under & I == 1, studyno]
-			# dat <- dat[studyno %in% include.who]
-			dat <- dat[time_length(difftime(as.Date("1985-01-01"), yob), "year") < age_under]
-			dat[, `:=`(yoc = min(yoc[1], yob[1] + years(age_under), na.rm = T)), studyno]
-		}
+			# Restrict age ####
+			if (is.finite(age_under)) {
+				# setorder(dat, studyno, age.year2)
+				# dat[,I := 1:.N, by = .(studyno)]
+				# include.who <- dat[age.year1/365 < age_under & I == 1, studyno]
+				# dat <- dat[studyno %in% include.who]
+				dat <- dat[time_length(difftime(as.Date("1985-01-01"), yob), "year") < age_under]
+				dat[, `:=`(yoc = min(yoc[1], yob[1] + years(age_under), na.rm = T)), studyno]
+			}
 
-		# Additional lag ####
-		setorder(dat, studyno, year)
-		dat[,`:=`(I = 1:.N,
-							N = .N), by = .(studyno)]
-		if (additional.lag > 0) {
-			dat[,`:=`(
-				straight = shift(straight, additional.lag, fill = 0),
-				cum_straight = shift(cum_straight, additional.lag, fill = 0),
-				soluble = shift(soluble, additional.lag, fill = 0),
-				cum_soluble = shift(cum_soluble, additional.lag, fill = 0),
-				synthetic = shift(synthetic, additional.lag, fill = 0),
-				cum_synthetic = shift(cum_synthetic, additional.lag, fill = 0)
-				# cum_bio = shift(cum_bio, additional.lag, fill = 0),
-				# cum_cl = shift(cum_cl, additional.lag, fill = 0),
-				# cum_ea = shift(cum_ea, additional.lag, fill = 0),
-				# cum_tea = shift(cum_tea, additional.lag, fill = 0),
-				# cum_trz = shift(cum_trz, additional.lag, fill = 0),
-				# cum_s = shift(cum_s, additional.lag, fill = 0),
-				# cum_no2 = shift(cum_no2, additional.lag, fill = 0),
-				# bio = shift(bio, additional.lag, fill = 0),
-				# cl = shift(cl, additional.lag, fill = 0),
-				# ea = shift(ea, additional.lag, fill = 0),
-				# tea = shift(tea, additional.lag, fill = 0),
-				# trz = shift(trz, additional.lag, fill = 0),
-				# s = shift(s, additional.lag, fill = 0),
-				# no2 = shift(no2, additional.lag, fill = 0)
-			), by = .(studyno)]
-		}
-		if (additional.lag < 0) {
-			dat[,`:=`(
-				straight = shift(straight, additional.lag, fill = straight[I == N]),
-				soluble = shift(soluble, additional.lag, fill = soluble[I == N]),
-				synthetic = shift(synthetic, additional.lag, fill = synthetic[I == N])
-				# bio = shift(bio, additional.lag, fill = bio[I == N]),
-				# cl = shift(cl, additional.lag, fill = cl[I == N]),
-				# ea = shift(ea, additional.lag, fill = ea[I == N]),
-				# tea = shift(tea, additional.lag, fill = tea[I == N]),
-				# trz = shift(trz, additional.lag, fill = trz[I == N]),
-				# s = shift(s, additional.lag, fill = s[I == N]),
-				# no2 = shift(no2, additional.lag, fill = no2[I == N])
-			), by = .(studyno)]
-			# Exposure after leaving work is 0
-			dat[year > (year(jobloss.date) + exposure.lag + additional.lag), `:=`(
-				straight = 0,
-				soluble = 0,
-				synthetic = 0
-				# bio = 0,
-				# cl = 0,
-				# ea = 0,
-				# tea = 0,
-				# trz = 0,
-				# s = 0,
-				# no2 = 0
-			)]
-			dat[,`:=`(
-				cum_straight = cumsum(straight),
-				cum_soluble = cumsum(soluble),
-				cum_synthetic = cumsum(synthetic)
-				# cum_bio = cumsum(bio),
-				# cum_cl = cumsum(cl),
-				# cum_ea = cumsum(ea),
-				# cum_tea = cumsum(tea),
-				# cum_trz = cumsum(trz),
-				# cum_s = cumsum(s),
-				# cum_no2 = cumsum(no2),
-			), by = .(studyno)]
-		}
+			# Additional lag ####
+			setorder(dat, studyno, year)
+			dat[,`:=`(I = 1:.N,
+								N = .N), by = .(studyno)]
+			if (additional.lag > 0) {
+				dat[,(paste0(rep(c("", "cum_"), each = 3),
+										 c("straight", "soluble", "synthetic"))) := lapply(
+										 	paste0(rep(c("", "cum_"), each = 3), c("straight", "soluble", "synthetic")),
+										 	function (x) {shift(get(x), additional.lag, fill = 0)}), by = .(studyno)]
+			}
+			if (additional.lag < 0) {
+				dat[,`:=`(
+					straight = shift(straight, additional.lag, fill = straight[I == N]),
+					soluble = shift(soluble, additional.lag, fill = soluble[I == N]),
+					synthetic = shift(synthetic, additional.lag, fill = synthetic[I == N])
+					# bio = shift(bio, additional.lag, fill = bio[I == N]),
+					# cl = shift(cl, additional.lag, fill = cl[I == N]),
+					# ea = shift(ea, additional.lag, fill = ea[I == N]),
+					# tea = shift(tea, additional.lag, fill = tea[I == N]),
+					# trz = shift(trz, additional.lag, fill = trz[I == N]),
+					# s = shift(s, additional.lag, fill = s[I == N]),
+					# no2 = shift(no2, additional.lag, fill = no2[I == N])
+				), by = .(studyno)]
+				# Exposure after leaving work is 0
+				dat[year > (year(jobloss.date) + exposure.lag + additional.lag), `:=`(
+					straight = 0,
+					soluble = 0,
+					synthetic = 0
+					# bio = 0,
+					# cl = 0,
+					# ea = 0,
+					# tea = 0,
+					# trz = 0,
+					# s = 0,
+					# no2 = 0
+				)]
+				dat[,`:=`(
+					cum_straight = cumsum(straight),
+					cum_soluble = cumsum(soluble),
+					cum_synthetic = cumsum(synthetic)
+					# cum_bio = cumsum(bio),
+					# cum_cl = cumsum(cl),
+					# cum_ea = cumsum(ea),
+					# cum_tea = cumsum(tea),
+					# cum_trz = cumsum(trz),
+					# cum_s = cumsum(s),
+					# cum_no2 = cumsum(no2),
+				), by = .(studyno)]
+			}
 
-		# # New category: Alkanolamines
-		# dat[,`:=`(
-		# 	ohnh = ea + tea,
-		# 	cum_ohnh = cum_ea + cum_tea
-		# )]
+			# # New category: Alkanolamines
+			# dat[,`:=`(
+			# 	ohnh = ea + tea,
+			# 	cum_ohnh = cum_ea + cum_tea
+			# )]
 
 
-		# When to start FU ####
-		# HWSE 3 is for the MWF-leaving work association: no bounds to FU
-		# If looking at mortality outcome, no need to start FU later
-		if (is.null(start.year)) {
-			if (#F # No more FU starting in 1941
-				hwse3 | i %in% which(grepl("copd|external|mort", incidence.key$code))
-			) {
-				dat$start.year <- 1941} else if (
-					# If looking at cancer incidence, should use 1973 or 1985
-					min(dat$ddiag_first, na.rm = T) < as.Date("1985-01-01")) {
-					dat$start.year <- 1973
-					dat[plant == 3, start.year := 1985]
+			# When to start FU ####
+			# HWSE 3 is for the MWF-leaving work association: no bounds to FU
+			# If looking at mortality outcome, no need to start FU later
+			if (is.null(start.year)) {
+				if (#F # No more FU starting in 1941
+					hwse3 | i %in% which(grepl("copd|external|mort", incidence.key$code))
+				) {
+					dat$start.year <- 1941} else if (
+						# If looking at cancer incidence, should use 1973 or 1985
+						min(dat$ddiag_first, na.rm = T) < as.Date("1985-01-01")) {
+						dat$start.year <- 1973
+						dat[plant == 3, start.year := 1985]
+					} else {
+						dat$start.year <- 1985
+					}
+			}
+
+			dat <- dat[year >= start.year]
+
+			if (!hwse3 & nrow(dat[
+				plant == 3 &
+				!i %in% which(grepl("copd|external|mort", incidence.key$code)) &
+				year < 1985]) > 0) {
+				message("Cancer incidence FU for plant 3 before 1985?")}
+
+			# Censor when (lagged) employment status not known ####
+			if (hwse2 | hwse3) {
+				if (employment_status.lag > 0) {
+					dat <- dat[jobloss.date <= as.Date(paste0(
+						1994 + employment_status.lag, "-12-31")) |
+							year <= 1994 + employment_status.lag]
 				} else {
-					dat$start.year <- 1985
-				}
-		}
+					dat <- dat[jobloss.date <= as.Date("1994-12-31") | year <= 1994 ]
+					dat[,`:=`(employment_status_lag = 0)]
+				}}
 
-		dat <- dat[year >= start.year]
-
-		if (!hwse3 & nrow(dat[
-			plant == 3 &
-			!i %in% which(grepl("copd|external|mort", incidence.key$code)) &
-			year < 1985]) > 0) {
-			message("Cancer incidence FU for plant 3 before 1985?")}
-
-		# Censor when (lagged) employment status not known ####
-		if (hwse2 | hwse3) {
-			if (employment_status.lag > 0) {
-				dat <- dat[jobloss.date <= as.Date(paste0(
-					1994 + employment_status.lag, "-12-31")) |
-						year <= 1994 + employment_status.lag]
+			if (!hwse3) {
+				dat[,`:=`(status = get(var.name),
+									yoi = get(date.name))]
 			} else {
-				dat <- dat[jobloss.date <= as.Date("1994-12-31") | year <= 1994 ]
-				dat[,`:=`(employment_status_lag = 0)]
-			}}
+				code <- ""
+				dat[year < year(jobloss.date), status := 0]
+				dat[year == year(jobloss.date), status := 1]
+				dat[year > year(jobloss.date), status := 2]
+				dat$yoi <- dat$jobloss.date
+			}
 
-		if (!hwse3) {
-			dat[,`:=`(status = get(var.name),
-								yoi = get(date.name))]
-		} else {
-			code <- ""
-			dat[year < year(jobloss.date), status := 0]
-			dat[year == year(jobloss.date), status := 1]
-			dat[year > year(jobloss.date), status := 2]
-			dat$yoi <- dat$jobloss.date
-		}
+			# If incidence is after date of death, make it the date of death ####
+			dat[yoi > yod, yoi := yod]
 
-		# If incidence is after date of death, make it the date of death ####
-		dat[yoi > yod, yoi := yod]
+			# if (hwse2) {
+			# 	# If job loss in the same year as incidence, and yoi was arbitrary ####
+			# 	dat[year(jobloss.date) == year(yoi) & month(yoi) == 7 & day(yoi) == 1,
+			# 			yoi := jobloss.date]
+			# }
 
-		# if (hwse2) {
-		# 	# If job loss in the same year as incidence, and yoi was arbitrary ####
-		# 	dat[year(jobloss.date) == year(yoi) & month(yoi) == 7 & day(yoi) == 1,
-		# 			yoi := jobloss.date]
-		# }
+			# Drop unnecessary data ####
+			dat <- dat[, -grep(
+				"canc_|ddiag|racon", names(dat)[
+					-which(names(dat) %in% c(
+						"ddiag_first", "canc_first", var.name))],
+				value = T), with = F]
 
-		# Drop unnecessary data ####
-		dat <- dat[, -grep(
-			"canc_|ddiag|racon", names(dat)[
-				-which(names(dat) %in% c(
-					"ddiag_first", "canc_first", var.name))],
-			value = T), with = F]
+			dat <- dat[year <= as.integer(apply(data.frame(
+				year(yoi),
+				year(yod),
+				year(yoc),
+				year.max), 1, min, na.rm = T)),]
 
-		dat <- dat[year <= as.integer(apply(data.frame(
-			year(yoi),
-			year(yod),
-			year(yoc),
-			year.max), 1, min, na.rm = T)),]
+			# If experienced cancer after censor date, make sure status is 0
+			dat[yoi >= yoc, status := 0]
+			# Check age and year index at last row
+			dat[year == year(yoc) & yoi >= yoc, `:=`(
+				age.year2 = time_length(difftime(
+					as.Date(apply(
+						data.frame(as.Date(paste0(year.max + 1, "-01-01")),
+											 yod + days(1),
+											 yoc + days(1)), 1, min, na.rm = T
+					)), yob), 'day'),
+				year2 = as.Date(apply(data.frame(
+					as.Date(paste0(year, "-12-31")),
+					as.Date(paste0(year.max, "-12-31")),
+					yod,
+					yoc), 1, min, na.rm = T
+				))
+			)]
 
-		# If experienced cancer after censor date, make sure status is 0
-		dat[yoi >= yoc, status := 0]
-		# Check age and year index at last row
-		dat[year == year(yoc) & yoi >= yoc, `:=`(
-			age.year2 = time_length(difftime(
-				as.Date(apply(
-					data.frame(as.Date(paste0(year.max + 1, "-01-01")),
-										 yod + days(1),
-										 yoc + days(1)), 1, min, na.rm = T
-				)), yob), 'day'),
-			year2 = as.Date(apply(data.frame(
-				as.Date(paste0(year, "-12-31")),
-				as.Date(paste0(year.max, "-12-31")),
-				yod,
-				yoc), 1, min, na.rm = T
-			))
-		)]
+			# Order data
+			setorder(dat, studyno, year)
+			dat[, `:=`(I = 1:.N,
+								 N = .N), by = .(studyno)]
 
-		# Order data
-		setorder(dat, studyno, year)
-		dat[, `:=`(I = 1:.N,
-							 N = .N), by = .(studyno)]
+			# Fix age.year1 for those hired before start.year - 3
+			dat[year(yin) + 3 < start.year & I == 1, `:=`(
+				age.year1 = time_length(
+					difftime(as.Date(paste0(start.year, "-01-01")), yob), 'days'),
+				year1 = as.Date(paste0(start.year - 1, "-12-31"))
+			)]
 
-		# Fix age.year1 for those hired before start.year - 3
-		dat[year(yin) + 3 < start.year & I == 1, `:=`(
-			age.year1 = time_length(
-				difftime(as.Date(paste0(start.year, "-01-01")), yob), 'days'),
-			year1 = as.Date(paste0(start.year - 1, "-12-31"))
-		)]
+			# Must be at-risk for incidence (or jobloss)
+			dat <- dat[yoi >= yin + years(3) | is.na(yoi)]
+			dat <- dat[status != 2]
 
-		# Must be at-risk for incidence (or jobloss)
-		dat <- dat[yoi >= yin + years(3) | is.na(yoi)]
-		dat <- dat[status != 2]
-
-		# Fix age.year2 at time of incidence (or jobloss)
-		dat[status == 1, `:=`(age.year2 = floor(time_length(difftime(
-			as.Date(apply(
-				data.frame(as.Date(paste0(
-					year.max + 1, "-01-01"
-				)),
-				yod + days(1),
-				yoc + days(1),
-				yoi + days(1)),
-				1,
-				min,
-				na.rm = T
-			)),
-			yob
-		), 'day')),
-		year2 = as.Date(apply(
-			data.frame(as.Date(paste0(
-				year.max, "-12-31"
-			)),
-			yod,
-			yoc,
-			yoi),
-			1,
-			min,
-			na.rm = T
-		)))]
+			# Fix age.year2 at time of incidence (or jobloss)
+			dat[status == 1, `:=`(
+				age.year2 = floor(time_length(difftime(
+					as.Date(apply(
+						data.frame(as.Date(paste0(
+							year.max + 1, "-01-01"
+						)),
+						yod + days(1),
+						yoc + days(1),
+						yoi + days(1)),
+						1,
+						min,
+						na.rm = T
+					)),
+					yob
+				), 'day')),
+				year2 = as.Date(apply(
+					data.frame(as.Date(paste0(
+						year.max, "-12-31"
+					)),
+					yod,
+					yoc,
+					yoi),
+					1,
+					min,
+					na.rm = T
+				)))]
 
 
-		# Don't confuse yoi with jobloss.date in the case of HWSE 3
-		if (hwse3) {
-			dat$yoi <- NA
-		}
+			# Don't confuse yoi with jobloss.date in the case of HWSE 3
+			if (hwse3) {
+				dat$yoi <- NA
+			}
 
-		# Duration of employment ####
-		dat[, `:=`(
-			employment.years = time_length(difftime(as.Date(
-				apply(data.frame(
-					jobloss.date,
-					as.Date(paste0(year + 1, "-01-01")),
-					as.Date("1995-01-01")
-				), 1, min, na.rm = T)
-			),
-			yin), 'year'))]
+			# Duration of employment ####
+			dat[, `:=`(
+				employment.years = time_length(difftime(as.Date(
+					apply(data.frame(
+						jobloss.date,
+						as.Date(paste0(year + 1, "-01-01")),
+						as.Date("1995-01-01")
+					), 1, min, na.rm = T)
+				),
+				yin), 'year'))]
 
-		# Duration of employment lag
-		if (employment_duration.lag != 0) {
-		dat[, employment.years := shift(employment.years, employment_duration.lag, 0)]}
+			# Duration of employment lag
+			if (employment_duration.lag != 0) {
+				dat[, employment.years := shift(employment.years, employment_duration.lag, 0)]}
 
-		# Age at leaving work (before employment status lag)
-		dat[,`:=`(age.leavework = time_length(difftime(jobloss.date, yob), 'year'))]
+			# Age at leaving work (before employment status lag)
+			dat[,`:=`(age.leavework = time_length(difftime(jobloss.date, yob), 'year'))]
 
-		# Define quantiles ####
-		covariate.breaks <- get.covariate.breaks(dat)
+			# Define quantiles ####
+			covariate.breaks <- get.covariate.breaks(dat)
 
-		# # Pool last two calendar year levels
-		# covariate.breaks[is.finite(year), year := {
-		# 	if (length(year) > 1) {
-		# 		c(year[-length(year)], NA)
-		# 	} else {
-		# 		year
-		# 	}
-		# }]
-		# # Restrict lower bound of last Year category?
-		# covariate.breaks[year > 2010 & is.finite(year), year := NA]
+			# # Pool last two calendar year levels
+			# covariate.breaks[is.finite(year), year := {
+			# 	if (length(year) > 1) {
+			# 		c(year[-length(year)], NA)
+			# 	} else {
+			# 		year
+			# 	}
+			# }]
+			# # Restrict lower bound of last Year category?
+			# covariate.breaks[year > 2010 & is.finite(year), year := NA]
 
-		mwf.breaks <- get.mwf.breaks(dat)
+			mwf.breaks <- get.mwf.breaks(dat)
 
-		# component.breaks <- apply(dat[status == 1, .(
-		# 	bio,
-		# 	cl,
-		# 	ea,
-		# 	tea,
-		# 	ohnh,
-		# 	trz,
-		# 	s,
-		# 	no2,
-		# 	cum_bio,
-		# 	cum_cl,
-		# 	cum_ea,
-		# 	cum_tea,
-		# 	cum_ohnh,
-		# 	cum_trz,
-		# 	cum_s,
-		# 	cum_no2)], 2, function(x) {
-		# 		x <- x[x > 0]
-		# 		if (length(x) > 40) {
-		# 			if (length(x) > 60) {
-		# 				probs <- seq(0, 1, 1 / 3)
-		# 			} else {
-		# 				probs <- seq(0, 1, 1 / 2)
-		# 			}
-		# 			breaks <- quantile(x, probs)
-		# 			breaks[c(1, length(probs))] <- c(0, Inf)
-		# 			breaks <- c(-Inf, breaks)
-		# 		} else {
-		# 			breaks <- c(-Inf, 0, Inf)
-		# 		}
-		# 		if (length(breaks) < 5) {
-		# 			breaks <- c(breaks, rep(NA, 5 - length(breaks)))
-		# 		}
-		# 		names(breaks) <- NULL
-		# 		breaks
-		# 	})
-		#
-		# component.breaks <- as.data.table(component.breaks)
+			# component.breaks <- apply(dat[status == 1, .(
+			# 	bio,
+			# 	cl,
+			# 	ea,
+			# 	tea,
+			# 	ohnh,
+			# 	trz,
+			# 	s,
+			# 	no2,
+			# 	cum_bio,
+			# 	cum_cl,
+			# 	cum_ea,
+			# 	cum_tea,
+			# 	cum_ohnh,
+			# 	cum_trz,
+			# 	cum_s,
+			# 	cum_no2)], 2, function(x) {
+			# 		x <- x[x > 0]
+			# 		if (length(x) > 40) {
+			# 			if (length(x) > 60) {
+			# 				probs <- seq(0, 1, 1 / 3)
+			# 			} else {
+			# 				probs <- seq(0, 1, 1 / 2)
+			# 			}
+			# 			breaks <- quantile(x, probs)
+			# 			breaks[c(1, length(probs))] <- c(0, Inf)
+			# 			breaks <- c(-Inf, breaks)
+			# 		} else {
+			# 			breaks <- c(-Inf, 0, Inf)
+			# 		}
+			# 		if (length(breaks) < 5) {
+			# 			breaks <- c(breaks, rep(NA, 5 - length(breaks)))
+			# 		}
+			# 		names(breaks) <- NULL
+			# 		breaks
+			# 	})
+			#
+			# component.breaks <- as.data.table(component.breaks)
 
-		# Make categorical variables ####
-		dat[, `:=`(
-			Year = get.cut(year, covariate.breaks),
-			`Year of hire` = get.cut(yin.gm, covariate.breaks, "yin"),
-			`Duration of employment` = get.cut(employment.years, covariate.breaks),
-			Age = get.cut(age.year2 / 365, covariate.breaks, "age"),
-			Straight = get.cut(straight, mwf.breaks, dig.lab = 3),
-			Soluble = get.cut(soluble, mwf.breaks, "soluble5", dig.lab = 3),
-			Synthetic =  get.cut(synthetic, mwf.breaks, dig.lab = 3),
-			`Synthetic 01` = get.cut(synthetic, mwf.breaks, "synthetic01", dig.lab = 3),
-			`Time off` =  get.cut(off, mwf.breaks, dig.lab = 3),
-			`Cumulative straight` = get.cut(cum_straight, mwf.breaks, dig.lab = 3),
-			`Cumulative soluble` = get.cut(cum_soluble, mwf.breaks, dig.lab = 3),
-			`Cumulative soluble 5` = get.cut(cum_soluble, mwf.breaks, "cum_soluble5", dig.lab = 3),
-			`Cumulative soluble 127` = get.cut(cum_soluble, mwf.breaks, "cum_soluble127", dig.lab = 3),
-			`Cumulative soluble 10` = get.cut(cum_soluble, mwf.breaks, "cum_soluble11", dig.lab = 3),
-			`Cumulative synthetic` = get.cut(cum_synthetic, mwf.breaks, dig.lab = 3),
-			`Cumulative synthetic 01` = get.cut(cum_synthetic, mwf.breaks, "cum_synthetic01", dig.lab = 3),
-			`Cumulative time off` =  get.cut(cum_off, mwf.breaks, dig.lab = 3)
-			# Biocide = get.cut(bio, component.breaks, dig.lab = 3),
-			# Chlorine = get.cut(cl, component.breaks, dig.lab = 3),
-			# Ethanolamine = get.cut(ea, component.breaks, dig.lab = 3),
-			# Triethanolamine = get.cut(tea, component.breaks, dig.lab = 3),
-			# Alkanolamine = get.cut(ohnh, component.breaks, dig.lab = 3),
-			# Triazine = get.cut(trz, component.breaks, dig.lab = 3),
-			# Sulfur = get.cut(s, component.breaks, dig.lab = 3),
-			# Nitrites = get.cut(no2, component.breaks, dig.lab = 3),
-			# `Cumulative biocide` = get.cut(cum_bio, component.breaks, dig.lab = 3),
-			# `Cumulative chlorine` = get.cut(cum_cl, component.breaks, dig.lab = 3),
-			# `Cumulative ethanolamine` = get.cut(cum_ea, component.breaks, dig.lab = 3),
-			# `Cumulative triethanolamine` = get.cut(cum_tea, component.breaks, dig.lab = 3),
-			# `Cumulative alkanolamine` = get.cut(cum_ohnh, component.breaks, dig.lab = 3),
-			# `Cumulative triazine` = get.cut(cum_trz, component.breaks, dig.lab = 3),
-			# `Cumulative sulfur` = get.cut(cum_s, component.breaks, dig.lab = 3),
-			# `Cumulative nitrosamine` = get.cut(cum_no2, component.breaks, dig.lab = 3)
-		)]
+			# Make categorical variables ####
+			dat[, `:=`(
+				Year = get.cut(year, covariate.breaks),
+				`Year of hire` = get.cut(yin.gm, covariate.breaks, "yin"),
+				`Duration of employment` = get.cut(employment.years, covariate.breaks),
+				Age = get.cut(age.year2 / 365, covariate.breaks, "age"),
+				Straight = get.cut(straight, mwf.breaks, dig.lab = 3),
+				Soluble = get.cut(soluble, mwf.breaks, "soluble5", dig.lab = 3),
+				Synthetic =  get.cut(synthetic, mwf.breaks, dig.lab = 3),
+				`Synthetic 01` = get.cut(synthetic, mwf.breaks, "synthetic01", dig.lab = 3),
+				`Time off` =  get.cut(off, mwf.breaks, dig.lab = 3),
+				`Cumulative straight` = get.cut(cum_straight, mwf.breaks, dig.lab = 3),
+				`Cumulative soluble` = get.cut(cum_soluble, mwf.breaks, dig.lab = 3),
+				`Cumulative soluble 5` = get.cut(cum_soluble, mwf.breaks, "cum_soluble5", dig.lab = 3),
+				`Cumulative soluble 127` = get.cut(cum_soluble, mwf.breaks, "cum_soluble127", dig.lab = 3),
+				`Cumulative soluble 10` = get.cut(cum_soluble, mwf.breaks, "cum_soluble11", dig.lab = 3),
+				`Cumulative synthetic` = get.cut(cum_synthetic, mwf.breaks, dig.lab = 3),
+				`Cumulative synthetic 01` = get.cut(cum_synthetic, mwf.breaks, "cum_synthetic01", dig.lab = 3),
+				`Cumulative time off` =  get.cut(cum_off, mwf.breaks, dig.lab = 3)
+				# Biocide = get.cut(bio, component.breaks, dig.lab = 3),
+				# Chlorine = get.cut(cl, component.breaks, dig.lab = 3),
+				# Ethanolamine = get.cut(ea, component.breaks, dig.lab = 3),
+				# Triethanolamine = get.cut(tea, component.breaks, dig.lab = 3),
+				# Alkanolamine = get.cut(ohnh, component.breaks, dig.lab = 3),
+				# Triazine = get.cut(trz, component.breaks, dig.lab = 3),
+				# Sulfur = get.cut(s, component.breaks, dig.lab = 3),
+				# Nitrites = get.cut(no2, component.breaks, dig.lab = 3),
+				# `Cumulative biocide` = get.cut(cum_bio, component.breaks, dig.lab = 3),
+				# `Cumulative chlorine` = get.cut(cum_cl, component.breaks, dig.lab = 3),
+				# `Cumulative ethanolamine` = get.cut(cum_ea, component.breaks, dig.lab = 3),
+				# `Cumulative triethanolamine` = get.cut(cum_tea, component.breaks, dig.lab = 3),
+				# `Cumulative alkanolamine` = get.cut(cum_ohnh, component.breaks, dig.lab = 3),
+				# `Cumulative triazine` = get.cut(cum_trz, component.breaks, dig.lab = 3),
+				# `Cumulative sulfur` = get.cut(cum_s, component.breaks, dig.lab = 3),
+				# `Cumulative nitrosamine` = get.cut(cum_no2, component.breaks, dig.lab = 3)
+			)]
 
-		dat[,`:=`(
-			Race = {
-				race <- relevel(factor(race), "White")
-				levels(race)[grep("Not white", levels(race))] <- "Black"
-				race},
-			Sex = factor(sex, levels = c("M", "F"), labels = c("Male", "Female")),
-			Plant = relevel(factor(plant), "1")
-		)]
+			dat[,`:=`(
+				Race = {
+					race <- relevel(factor(race), "White")
+					levels(race)[grep("Not white", levels(race))] <- "Black"
+					race},
+				Sex = factor(sex, levels = c("M", "F"), labels = c("Male", "Female")),
+				Plant = relevel(factor(plant), "1")
+			)]
 
-		dat[, `:=`(
-			year1.date = year1,
-			year2.date = year2,
-			year1 = as.numeric(year1, origin = as.Date("1970-01-01")),
-			year2 = as.numeric(year2, origin = as.Date("1970-01-01"))
-		)]
+			dat[, `:=`(
+				year1.date = year1,
+				year2.date = year2,
+				year1 = as.numeric(year1, origin = as.Date("1970-01-01")),
+				year2 = as.numeric(year2, origin = as.Date("1970-01-01"))
+			)]
 
-		# dat <- dat[studyno %in% sample(studyno, 5000)]
-		setorder(dat, studyno, age.year2)
-		# Save data ####
-		if (save_dat) {
-			assign(
-				paste0(code, ifelse(!hwse3, ".", ""), "dat", ifelse(hwse2, 2, ifelse(hwse3, 3, ""))),
-				dat,
-				inherits = T,
-				envir = .GlobalEnv)
-			Sys.sleep(0)
-		}} else {
-			dat <- get(paste0(code, ifelse(!hwse3, ".", ""), "dat", ifelse(hwse2, 2, ifelse(hwse3, 3, ""))),
-								 envir = .GlobalEnv)
-		}
+			# dat <- dat[studyno %in% sample(studyno, 5000)]
+			setorder(dat, studyno, age.year2)
+			# Save data ####
+			if (save_dat) {
+				assign(
+					paste0(code, ifelse(!hwse3, ".", ""), "dat", ifelse(hwse2, 2, ifelse(hwse3, 3, ""))),
+					dat,
+					inherits = T,
+					envir = .GlobalEnv)
+				Sys.sleep(0)
+			}} else {
+				dat <- get(paste0(code, ifelse(!hwse3, ".", ""), "dat", ifelse(hwse2, 2, ifelse(hwse3, 3, ""))),
+									 envir = .GlobalEnv)
+			}
 
 		# Get data to impute
 		if (mi > 0) {
@@ -731,10 +714,8 @@ get.hwse2.coxph <- function(
 								)
 							), yob), 'day'),
 							year2 = as.Date(apply(
-								data.frame(as.Date(paste0(
-									year, "-12-31"
-								)),
-								yoc, yod, yoi),
+								data.frame(as.Date(paste0(year, "-12-31")),
+													 yoc, yod, yoi),
 								1,
 								min,
 								na.rm = T
@@ -969,7 +950,9 @@ get.hwse2.coxph <- function(
 							ifelse(!grepl("age", time_scale),
 										 "indexed by calendar",
 										 "indexed by age"
-							), sep = "/"))))
+							),
+							if (lazy_indexing) {"left work for entire year"} else  {NULL},
+							sep = "/"))))
 		}
 
 		if (length(directory.name) <= 1) {
@@ -1137,10 +1120,10 @@ get.hwse3.coxph <- function(
 	new_dat = T,
 	save_dat = T,
 	messy_sol = 0.05,
-	spline_year = F,
+	spline_year = T,
 	year.df = 0,
 	include_yin = F,
-	spline_yin = F,
+	spline_yin = T,
 	yin.df = 0,
 	time_scale = "age",
 	additional.lag = 0,
@@ -1404,7 +1387,8 @@ get.coef <- function(
 	year.max = Inf,
 	start.year = NULL,
 	mi = 0,
-	age_under = Inf
+	age_under = Inf,
+	lazy_indexing = F
 ) {
 
 	# start time
@@ -1506,6 +1490,7 @@ get.coef <- function(
 									 			ifelse(hwse2, employment.which, ""),
 									 			sep = "/"),
 									 paste("indexed by age",
+									 			if (lazy_indexing) {"left work for entire year"} else  {NULL},
 									 			ifelse(hwse2, employment.which, ""), sep = "/")),
 						sep = "/")))
 			}
@@ -1603,18 +1588,18 @@ get.coef <- function(
 			# Set aside non-categorical stuff
 			if (spline_year | spline_yin | linear_duration) {
 				tmp.spline.coef <- tmp.coef[!sapply(tmp.coef$Covariate, function(x) {
-				as.logical(max(sapply(names(covariate.levels), grepl, x)))
-			})]
+					as.logical(max(sapply(names(covariate.levels), grepl, x)))
+				})]
 				tmp.spline.coef[, `:=`(
 					Covariate = {
 						Covariate[grepl("pspline", Covariate)] <- substr(
-						Covariate[grepl("pspline", Covariate)], 1, gregexpr("\\)", Covariate[grepl("pspline", Covariate)]))
+							Covariate[grepl("pspline", Covariate)], 1, gregexpr("\\)", Covariate[grepl("pspline", Covariate)]))
 						Covariate
-						}
+					}
 				)]
 				tmp.coef <- tmp.coef[sapply(tmp.coef$Covariate, function(x) {
-				as.logical(max(sapply(names(covariate.levels), grepl, x)))
-			})]
+					as.logical(max(sapply(names(covariate.levels), grepl, x)))
+				})]
 			}
 
 			covariates <- unique(tmp.coef$Covariate)
@@ -1669,7 +1654,7 @@ get.coef <- function(
 										grepl("Age", x),
 										floor(min(dat.og[immortal == 0]$age.year2) / 365),
 										floor(min(dat.og[immortal == 0]$`Employment years`))
-										)))
+									)))
 							ref.upper <- min(as.numeric(lower))
 							ref.level <- paste0("$", ref.lower, "$ to $", ref.upper, "$")
 						} else if (grepl("Race", x)) {
@@ -1740,10 +1725,9 @@ get.coef <- function(
 						} else if (grepl("Cumu", x)) {
 							ref.lower <- -Inf
 							ref.upper <- min(as.numeric(lower))
-							ref.level <-
-								ifelse(ref.upper == 0,
-											 "$0$",
-											 paste0("$", 0, "$ to $", ref.upper, "$"))
+							ref.level <- ifelse(ref.upper == 0,
+																	"$0$",
+																	paste0("$", 0, "$ to $", ref.upper, "$"))
 						} else if (grepl("Year|Age|Duration", x)) {
 							ref.lower <- ifelse(
 								grepl("Year$", x),
@@ -1754,8 +1738,8 @@ get.coef <- function(
 									ifelse(
 										grepl("Age", x),
 										floor(min(dat.og[immortal == 0]$age.year2) / 365),
-										floor(min(dat.og[immortal == 0]$`Employment years`))
-										)))
+										floor(min(dat.og[immortal == 0]$employment.years))
+									)))
 							ref.upper <- min(as.numeric(lower))
 							ref.level <- paste0("$", ref.lower, "$ to $", ref.upper, "$")
 						} else if (grepl("Race", x)) {
@@ -1832,15 +1816,15 @@ get.coef <- function(
 						df = {
 							if ("gam" %in% class(tmp.coxph)) {
 								round(sapply(1:length(tmp.coxph$smooth), function(i) {tmp.coxph$smooth[[i]]$df}), 2)
-								} else {
-									round(tmp.coxph$df[sapply(
-										Covariate, match, gsub("`", "", full.covariates))],
-										2)}
-							},
+							} else {
+								round(tmp.coxph$df[sapply(
+									Covariate, match, gsub("`", "", full.covariates))],
+									2)}
+						},
 						Covariate = {
 							Covariate[grepl("pspline", Covariate)] <- gsub("yin.gm", "year of hire", gsub(
-							"year", "calendar year",
-							paste0("P-spline of ", gsub("pspline\\(|, df.*$", "", Covariate[grepl("pspline", Covariate)]))))
+								"year", "calendar year",
+								paste0("P-spline of ", gsub("pspline\\(|, df.*$", "", Covariate[grepl("pspline", Covariate)]))))
 							Covariate}
 					)]
 				), use.names = T, fill = T)
@@ -1885,9 +1869,12 @@ get.coef <- function(
 			},
 			level,
 			n,
-			HR = paste0("$", formatC(
-				round(HR, 2), format = "f", digits = 2
-			), "$"),
+			HR = sapply(HR, function(x) {
+				if (is.na(x)) {as.character(NA)} else {
+					paste0("$", formatC(
+						round(x, 2), format = "f", digits = 2
+					), "$")}
+			}),
 			`(95% CI)` = {
 				lower <- formatC(round(lower.ci, 2),
 												 format = "f",
@@ -1899,13 +1886,20 @@ get.coef <- function(
 				ci[grepl("NA", ci)] <- NA
 				ci
 			},
-			p = as.character(formatC(round(p, 2), format = "f", digits = 2)),
-			`SE` = as.character(formatC(round(SE, 3), format = "f", digits = 3)),
+			p = sapply(p, function(x) {
+				if (is.na(x)) {as.character(NA)} else {
+					as.character(formatC(round(x, 2), format = "f", digits = 2))}
+			}),
+			`SE` = sapply(SE, function(x) {
+				if (is.na(x)) {as.character(NA)} else {
+					as.character(formatC(round(x, 3), format = "f", digits = 3))}
+			}),
 			events,
-			df = as.character(formatC(round(df, 2), format = "f", digits = 2))
+			df = sapply(df, function(x) {
+				if (is.na(x)) {as.character(NA)} else {
+					as.character(formatC(round(x, 2), format = "f", digits = 2))}
+			})
 		)]
-
-		coef.tab[grepl("NA", p), p := NA]
 
 		if (spline_year | spline_yin | linear_duration) {
 			coef.tab[grepl("spline", Covariate), Covariate := paste0(
@@ -1927,6 +1921,7 @@ get.coef <- function(
 								 			 			 paste0("/Employment status lagged ", employment_status.lag, " years"), "")),
 								 paste0("Lag ", exposure.lag))),
 				ifelse(grepl("age", time_scale), "indexed by age", "indexed by calendar"),
+				if (lazy_indexing) {"left work for entire year"} else  {NULL},
 				ifelse(hwse2, employment.which, ""),
 				sep = "/"
 			))
@@ -2118,7 +2113,8 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 													 coef.directory = NULL,
 													 mi = 0,
 													 year.max = 1994,
-													 age_under = Inf) {
+													 age_under = Inf,
+													 lazy_indexing = F) {
 	lapply(outcomes, function(
 		i = outcomes.which[1]
 	) {
@@ -2137,6 +2133,7 @@ get.hwse.ggtab <- function(outcomes = outcomes.which,
 							 			 employment_status.lag, " years")),
 				ifelse(!grepl("age", time_scale),
 							 "/indexed by calendar", "/indexed by age"),
+				if (lazy_indexing) {"/left work for entire year"} else  {NULL},
 				"/"))
 		}
 
@@ -2203,11 +2200,14 @@ get.tikz <- function(
 	ggtab.prefix = c("str", "sol", "syn"),
 	file.prefix = NULL,
 	directory = NULL,
-	width = 6.5, height = 8.5) {
+	width = 6.5, height = 8.5,
+	hr.min = 0.99,
+	hr.max = 1.4,
+	log_scale = T) {
 
 	prefix.which <- 1:length(ggtab.prefix)
 
-	sapply(prefix.which, function(i = 3) {
+	sapply(prefix.which, function(i = 1) {
 
 		gg.tab <- get(paste0(ggtab.prefix[i], ".ggtab"))
 
@@ -2217,7 +2217,7 @@ get.tikz <- function(
 		# 	by = .(Outcome)]
 		# legend.tab[grepl('cases', description), Outcome := NA]
 		legend.tab <- gg.tab[,.(
-			I = c(quantile(I, 0.5)),
+			I = c(mean(I)),
 			description = paste0(
 				"\\begin{tabular}{l}",
 				Outcome[1],	"\\\\",
@@ -2225,6 +2225,8 @@ get.tikz <- function(
 				"\\end{tabular}")
 		),
 		by = .(Outcome)]
+
+		window.nudge <- diff(range(gg.tab$I)) * 0.004
 
 		dir.create(directory, showWarnings = F, recursive = T)
 		tikz(file = paste(directory, paste0(ifelse(is.null(file.prefix[i]), ggtab.prefix[i], file.prefix[i]), ".tex"), sep = "/"),
@@ -2240,18 +2242,20 @@ get.tikz <- function(
 				scale_shape_manual(values = c(1:7, 1:7, 1:4)) +
 				scale_x_continuous(breaks = gg.tab$I,
 													 labels = gg.tab$level) +
+				scale_y_continuous(
+					breaks = exp(seq(log(0.5), log(hr.max), length.out = 4)),
+					labels = round(exp(seq(log(0.5), log(hr.max), length.out = 4)), 1),
+					trans = "log") +
 				geom_hline(aes(yintercept = 1), color = 'gray') +
 				coord_flip(
-					ylim = {
-						if (ggtab.prefix[i] != "hwse") {
-							c(0.4, 2.1)} else {c(0, 3.6)}},
+					ylim = c(hr.min, hr.max),
 					xlim = c(
-						min(gg.tab$I),
-						max(gg.tab$I))) +
+						min(gg.tab$I) + window.nudge,
+						max(gg.tab$I) - window.nudge)) +
 				mytheme + labs(y = "") +
-				theme(plot.margin = unit(c(0.1, 0, 0.1, 0.1), "cm"),
+				theme(plot.margin = unit(c(0.1, 0, 0.1, 0.25), "cm"),
+							axis.title = element_blank(),
 							panel.grid = element_blank(),
-							axis.title.y = element_text(color = "white"),
 							legend.position = "none"),
 			# Legend
 			ggplot(legend.tab, aes(
@@ -2260,31 +2264,39 @@ get.tikz <- function(
 				ymin = 1 - 0.01,
 				ymax = 1 + 0.01,
 				shape = Outcome,
-				label = gsub(
-					" cancer| cancers", "",
-					gsub("nervous system", "neural", description))
+				label = {
+					cancer.labs <- gsub(
+						" cancer| cancers", "",
+						gsub("nervous system", "neural", description))
+					cancer.labs <- gsub("All", "All cancers", cancer.labs)
+					cancer.labs}
 			)) +
 				geom_pointrange(size = 0.07) +
 				scale_shape_manual(values = c(1:7, 1:7, 1:4)) +
 				geom_text(aes(
 					x = I,
-					y = 1 + 0.05), position = 'identity', hjust = 0, size = 2.75) +
+					y = 1 + 0.015), position = 'identity', hjust = 0, size = 2.75) +
 				# facet_wrap(. ~ prefix, scales = 'free_x', ncol = 1) +
-				theme_classic() + coord_flip(ylim = c(0.99 , 1.4),
-																		 xlim = c(
-																		 	min(gg.tab$I),
-																		 	max(gg.tab$I))) +
-				labs(x = "", y = '') +
+				mytheme + coord_flip(
+					ylim = c(1 - 0.01, 1 + 0.1),
+					xlim = c(
+						min(gg.tab$I) + window.nudge,
+						max(gg.tab$I) - window.nudge)) +
 				scale_x_continuous(breaks = gg.tab$I) +
-				theme(plot.margin = unit(c(0.1, 0.1, 0.1, -0.2), "cm"),
+				labs(x = "", y = "") +
+				theme(plot.margin = unit(c(0.1, 0.1, 0.1, 0), "cm"),
 							legend.position = 'none',
-							axis.text = element_text(colour = 'white'),
+							panel.grid = element_blank(),
+							panel.border = element_rect(color = "white"),
+							panel.background = element_blank(),
+							axis.title = element_blank(),
+							axis.text.y = element_blank(),
+							axis.text.x = element_text(color = "white"),
 							axis.ticks = element_blank(),
-							axis.line = element_line(color = "white"),
-							axis.title.y = element_text(color = "white"),
-							strip.text = element_text(colour = 'white'),
+							axis.line =  element_line(color = "white"),
+							strip.text =  element_blank(),
 							strip.background = element_rect(color = "white")),
-			ncol = 2, widths = c(0.6, 0.4)
+			ncol = 2, widths = c(0.72, 0.28)
 		)
 		dev.off()
 	})
@@ -2298,9 +2310,10 @@ get.facet_tikz <- function(
 	messy_sol = 0.05,
 	year.max = 1994,
 	width = 11, height = 8.5,
-	age_under = Inf) {
+	age_under = Inf,
+	hr.min = 0.05, hr.max = 2.5) {
 
-	lapply(ggtab.prefix, function(prefix = "sol") {
+	lapply(ggtab.prefix, function(prefix = "hwse") {
 
 		i <- which(ggtab.prefix == prefix)
 
@@ -2315,7 +2328,7 @@ get.facet_tikz <- function(
 
 
 		gg.tab <- data.table::copy(get(paste0("og_", prefix, ".ggtab")))
-		gg.tab <- gg.tab[!grepl(" 50| 55| 60", level)]
+		gg.tab <- gg.tab[!grepl("^50|^55|^60", level)]
 		gg.tab[grepl("any", level), level := gsub("At any age", "Left work", level)]
 
 		gg.tab[is.na(as.numeric(ci.lower)), `:=`(
@@ -2333,6 +2346,8 @@ get.facet_tikz <- function(
 			level.factor = factor(.N:1)
 		), by = .(Outcome)]
 
+		window.nudge <- (max(gg.tab[,.N, by = .(Outcome)]$N) - 1) * 0.002
+
 		gg.plot <- ggplot(gg.tab, aes(
 			x = level.factor,
 			y = HR,
@@ -2340,17 +2355,19 @@ get.facet_tikz <- function(
 			ymax = ci.upper
 		)) + geom_pointrange(size = 0.15) +
 			geom_hline(aes(yintercept = 1), color = 'gray') +
-			geom_text(aes(x = level.factor, y = ifelse(grepl("hwse", prefix), 0.3, 0.33), label = level), hjust = 1, size = 3) +
+			geom_text(aes(x = level.factor, y = ifelse(
+				grepl("hwse", prefix),
+				(log(hr.max) - log(hr.min)) * 0.03 + hr.min, 0.33), label = level),
+				hjust = 1, size = 3) +
 			coord_flip(
-				ylim = {if (grepl("hwse", prefix)) {
-					c(0.05, 4.5)
-				} else {c(0.05, 2.5)}},
-				xlim = c(max(gg.tab[,.N, by = .(Outcome)]$N) + 1, 0)
+				ylim = c(hr.min, hr.max),
+				xlim = c(1 + window.nudge,
+								 max(gg.tab[,.N, by = .(Outcome)]$N) - window.nudge)
 			) +
-			scale_y_continuous(breaks = {
-				if (grepl("hwse", prefix)) {seq(0.5, 4.5, 1)} else {
-					seq(0.5, 2.5, 0.5)
-				}}, trans = "log") +
+			scale_y_continuous(
+				breaks = exp(seq(log(0.5), log(hr.max), length.out = 4)),
+				labels = round(exp(seq(log(0.5), log(hr.max), length.out = 4)), 1),
+				trans = "log") +
 			mytheme + labs(y = "") +
 			facet_wrap(. ~ Outcome, ncol = 3) +
 			theme(
